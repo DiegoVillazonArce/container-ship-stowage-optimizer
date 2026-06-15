@@ -32,24 +32,24 @@ Create the foundational Python data model for vessels, slots, containers, routes
 
 ### Tasks
 
-- Create `Slot` model.
-- Create `Ship` model.
-- Create `Container` model.
-- Create `Route` or port sequence model.
-- Create `ProblemInstance` model.
-- Generate bay-row-tier grid.
-- Add normalized coordinates `x`, `y`, and `z`.
-- Add reefer-capable slot metadata.
-- Add container fields: `id`, `weight`, `destination_port`, and `type`.
-- Add supported container types: `Normal`, `Reefer`, `Flammable`, and `Oxidizer`.
-- Add input validation for duplicate IDs.
-- Add input validation for missing or invalid weights.
-- Add input validation for unknown container types.
-- Add input validation for destination ports missing from the route.
-- Add input validation for more containers than available slots.
-- Add input validation for more reefer containers than reefer-capable slots.
-- Create small sample instance, such as `6 x 4 x 4`.
-- Add unit tests.
+- [ ] Create `Slot` model.
+- [ ] Create `Ship` model.
+- [ ] Create `Container` model.
+- [ ] Create `Route` or port sequence model.
+- [ ] Create `ProblemInstance` model.
+- [ ] Generate bay-row-tier grid.
+- [ ] Add normalized coordinates `x`, `y`, and `z`.
+- [ ] Add reefer-capable slot metadata.
+- [ ] Add container fields: `id`, `weight`, `destination_port`, and `type`.
+- [ ] Add supported container types: `Normal`, `Reefer`, `Flammable`, and `Oxidizer`.
+- [ ] Add input validation for duplicate IDs.
+- [ ] Add input validation for missing or invalid weights.
+- [ ] Add input validation for unknown container types.
+- [ ] Add input validation for destination ports missing from the route.
+- [ ] Add input validation for more containers than available slots.
+- [ ] Add input validation for more reefer containers than reefer-capable slots.
+- [ ] Create small sample instance, such as `6 x 4 x 4`.
+- [ ] Add unit tests.
 
 ### Definition of Done
 
@@ -74,23 +74,23 @@ Implement common metrics that every solver can use for evaluation and comparison
 
 ### Tasks
 
-- Create `metrics.py`.
-- Implement total weight calculation.
-- Implement slot utilization calculation.
-- Implement lateral moment calculation.
-- Implement longitudinal moment calculation.
-- Implement `CG_y`.
-- Implement `CG_x`.
-- Implement normalized `CG_z`.
-- Implement port-side and starboard-side weight reporting.
-- Implement bow and stern weight reporting.
-- Implement horizontal CG tolerance checks.
-- Implement reefer violation checks.
-- Implement stack continuity violation checks.
-- Implement incompatible cargo violation checks.
-- Implement real rehandling simulation by route order.
-- Implement final metrics object or dictionary.
-- Add unit tests for hand-checkable layouts.
+- [ ] Create `metrics.py`.
+- [ ] Implement total weight calculation.
+- [ ] Implement slot utilization calculation.
+- [ ] Implement lateral moment calculation.
+- [ ] Implement longitudinal moment calculation.
+- [ ] Implement `CG_y`.
+- [ ] Implement `CG_x`.
+- [ ] Implement normalized `CG_z`.
+- [ ] Implement port-side and starboard-side weight reporting.
+- [ ] Implement bow and stern weight reporting.
+- [ ] Implement horizontal CG tolerance checks.
+- [ ] Implement reefer violation checks.
+- [ ] Implement stack continuity violation checks.
+- [ ] Implement incompatible cargo violation checks.
+- [ ] Implement real rehandling simulation by route order.
+- [ ] Implement final metrics object or dictionary.
+- [ ] Add unit tests for hand-checkable layouts.
 
 ### Definition of Done
 
@@ -115,21 +115,21 @@ Create a fast constructive solver that produces an initial baseline solution and
 
 ### Tasks
 
-- Create common solver interface.
-- Create `GreedySolver`.
-- Sort containers by weight and constraint priority.
-- Generate candidate slots for each container.
-- Enforce slot capacity during construction.
-- Enforce stack continuity during construction.
-- Enforce reefer compatibility during construction.
-- Add scoring for horizontal CG impact.
-- Add scoring for vertical placement.
-- Add scoring for rehandling risk.
-- Add simplified incompatible cargo checks.
-- Add optional swap-based repair.
-- Return solution status: feasible, repaired, or infeasible.
-- Report runtime.
-- Add unit tests with small instances.
+- [ ] Create common solver interface.
+- [ ] Create `GreedySolver`.
+- [ ] Sort containers by weight and constraint priority.
+- [ ] Generate candidate slots for each container.
+- [ ] Enforce slot capacity during construction.
+- [ ] Enforce stack continuity during construction.
+- [ ] Enforce reefer compatibility during construction.
+- [ ] Add scoring for horizontal CG impact.
+- [ ] Add scoring for vertical placement.
+- [ ] Add scoring for rehandling risk.
+- [ ] Add simplified incompatible cargo checks.
+- [ ] Add optional swap-based repair.
+- [ ] Return solution status: feasible, repaired, or infeasible.
+- [ ] Report runtime.
+- [ ] Add unit tests with small instances.
 
 ### Definition of Done
 
@@ -153,25 +153,25 @@ Implement the exact optimization reference for small instances using a Mixed Int
 
 ### Tasks
 
-- Choose MILP library, such as OR-Tools, PuLP, or Pyomo.
-- Create `MILPSolver`.
-- Define binary variables `x[c, p]`.
-- Add unique assignment constraints.
-- Add slot capacity constraints.
-- Add stack continuity constraints.
-- Add reefer compatibility constraints.
-- Add bay-level binary variables for flammable cargo.
-- Add bay-level binary variables for oxidizer cargo.
-- Add minimum bay-distance separation constraints.
-- Add horizontal CG moment constraints.
-- Add auxiliary variables for absolute lateral CG deviation.
-- Add auxiliary variables for absolute longitudinal CG deviation.
-- Add normalized vertical CG penalty.
-- Add linear rehandling proxy.
-- Add objective weights.
-- Add solver time limit configuration.
-- Return status, objective value, runtime, and gap when available.
-- Add tests for infeasible and feasible small instances.
+- [ ] Choose MILP library, such as OR-Tools, PuLP, or Pyomo.
+- [ ] Create `MILPSolver`.
+- [ ] Define binary variables `x[c, p]`.
+- [ ] Add unique assignment constraints.
+- [ ] Add slot capacity constraints.
+- [ ] Add stack continuity constraints.
+- [ ] Add reefer compatibility constraints.
+- [ ] Add bay-level binary variables for flammable cargo.
+- [ ] Add bay-level binary variables for oxidizer cargo.
+- [ ] Add minimum bay-distance separation constraints.
+- [ ] Add horizontal CG moment constraints.
+- [ ] Add auxiliary variables for absolute lateral CG deviation.
+- [ ] Add auxiliary variables for absolute longitudinal CG deviation.
+- [ ] Add normalized vertical CG penalty.
+- [ ] Add linear rehandling proxy.
+- [ ] Add objective weights.
+- [ ] Add solver time limit configuration.
+- [ ] Return status, objective value, runtime, and gap when available.
+- [ ] Add tests for infeasible and feasible small instances.
 
 ### Definition of Done
 
@@ -196,23 +196,23 @@ Create a metaheuristic solver for larger instances where MILP may become too exp
 
 ### Tasks
 
-- Create `GeneticSolver`.
-- Define chromosome representation.
-- Generate initial population.
-- Add feasibility-aware initialization when possible.
-- Implement fitness evaluation.
-- Include horizontal CG deviation in fitness.
-- Include normalized `CG_z` in fitness.
-- Include real rehandling simulation in fitness.
-- Include penalty for constraint violations.
-- Implement selection.
-- Implement crossover.
-- Implement mutation.
-- Implement repair for duplicate slots and missing containers.
-- Implement stopping criteria.
-- Report best solution, runtime, and generation count.
-- Add reproducible random seed configuration.
-- Add tests for encoding, decoding, and repair logic.
+- [ ] Create `GeneticSolver`.
+- [ ] Define chromosome representation.
+- [ ] Generate initial population.
+- [ ] Add feasibility-aware initialization when possible.
+- [ ] Implement fitness evaluation.
+- [ ] Include horizontal CG deviation in fitness.
+- [ ] Include normalized `CG_z` in fitness.
+- [ ] Include real rehandling simulation in fitness.
+- [ ] Include penalty for constraint violations.
+- [ ] Implement selection.
+- [ ] Implement crossover.
+- [ ] Implement mutation.
+- [ ] Implement repair for duplicate slots and missing containers.
+- [ ] Implement stopping criteria.
+- [ ] Report best solution, runtime, and generation count.
+- [ ] Add reproducible random seed configuration.
+- [ ] Add tests for encoding, decoding, and repair logic.
 
 ### Definition of Done
 
@@ -236,23 +236,23 @@ Build a simple interactive interface for configuring scenarios, running solvers,
 
 ### Tasks
 
-- Create `app/main.py`.
-- Add Streamlit sidebar.
-- Add vessel dimension inputs.
-- Add reefer slot or reefer bay configuration.
-- Add CSV upload.
-- Add route sequence input.
-- Add algorithm selector.
-- Add CG tolerance controls.
-- Add objective weight controls.
-- Add solver time limit controls.
-- Add run optimization button.
-- Display validation errors.
-- Display solution status.
-- Display common KPI metrics.
-- Display final stowage plan table.
-- Display algorithm comparison table.
-- Add session state for latest scenario and solution.
+- [ ] Create `app/main.py`.
+- [ ] Add Streamlit sidebar.
+- [ ] Add vessel dimension inputs.
+- [ ] Add reefer slot or reefer bay configuration.
+- [ ] Add CSV upload.
+- [ ] Add route sequence input.
+- [ ] Add algorithm selector.
+- [ ] Add CG tolerance controls.
+- [ ] Add objective weight controls.
+- [ ] Add solver time limit controls.
+- [ ] Add run optimization button.
+- [ ] Display validation errors.
+- [ ] Display solution status.
+- [ ] Display common KPI metrics.
+- [ ] Display final stowage plan table.
+- [ ] Display algorithm comparison table.
+- [ ] Add session state for latest scenario and solution.
 
 ### Definition of Done
 
@@ -276,19 +276,19 @@ Add Plotly-based 3D visualization and port-by-port unloading analysis.
 
 ### Tasks
 
-- Create `viz/plot3d.py`.
-- Generate Plotly 3D container blocks or markers.
-- Color containers by destination port.
-- Add hover details for container ID, weight, port, type, and slot.
-- Add visual distinction for reefer containers.
-- Add visual distinction for dangerous cargo classes.
-- Add selected-port unloading simulation.
-- Identify containers removed at each port.
-- Identify temporary rehandling moves.
-- Recompute metrics after simulated unloading.
-- Display updated utilization.
-- Display updated CG metrics.
-- Add tests for unloading sequence logic.
+- [ ] Create `viz/plot3d.py`.
+- [ ] Generate Plotly 3D container blocks or markers.
+- [ ] Color containers by destination port.
+- [ ] Add hover details for container ID, weight, port, type, and slot.
+- [ ] Add visual distinction for reefer containers.
+- [ ] Add visual distinction for dangerous cargo classes.
+- [ ] Add selected-port unloading simulation.
+- [ ] Identify containers removed at each port.
+- [ ] Identify temporary rehandling moves.
+- [ ] Recompute metrics after simulated unloading.
+- [ ] Display updated utilization.
+- [ ] Display updated CG metrics.
+- [ ] Add tests for unloading sequence logic.
 
 ### Definition of Done
 
@@ -312,19 +312,19 @@ Finalize the academic project by strengthening tests, creating benchmark scenari
 
 ### Tasks
 
-- Add unit tests for domain models.
-- Add unit tests for validation.
-- Add unit tests for metrics.
-- Add unit tests for solver interfaces.
-- Add integration tests for small scenarios.
-- Create benchmark datasets.
-- Benchmark Greedy, MILP, and GA on shared instances.
-- Record runtime, feasibility, CG metrics, `CG_z`, rehandling, utilization, and violations.
-- Document solver assumptions.
-- Document known limitations.
-- Update README links to design and roadmap documents.
-- Add example screenshots after the interface exists.
-- Add reproducibility notes.
+- [ ] Add unit tests for domain models.
+- [ ] Add unit tests for validation.
+- [ ] Add unit tests for metrics.
+- [ ] Add unit tests for solver interfaces.
+- [ ] Add integration tests for small scenarios.
+- [ ] Create benchmark datasets.
+- [ ] Benchmark Greedy, MILP, and GA on shared instances.
+- [ ] Record runtime, feasibility, CG metrics, `CG_z`, rehandling, utilization, and violations.
+- [ ] Document solver assumptions.
+- [ ] Document known limitations.
+- [ ] Update README links to design and roadmap documents.
+- [ ] Add example screenshots after the interface exists.
+- [ ] Add reproducibility notes.
 
 ### Definition of Done
 
