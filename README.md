@@ -161,8 +161,8 @@ The objective function optimizes quality inside the feasible region defined by t
 
 The planned MILP objective combines:
 
-- Lateral center-of-gravity deviation.
 - Longitudinal center-of-gravity deviation.
+- Lateral center-of-gravity deviation.
 - Vertical center-of-gravity penalty.
 - Linear proxy for rehandling cost.
 
@@ -170,10 +170,10 @@ Conceptually:
 
 ```text
 minimize
-  alpha  * lateral_CG_deviation
-+ beta   * longitudinal_CG_deviation
-+ lambda * vertical_CG_penalty
-+ delta  * rehandling_proxy
+  alpha_lon * longitudinal_CG_deviation
++ alpha_lat * lateral_CG_deviation
++ lambda    * vertical_CG_penalty
++ delta     * rehandling_proxy
 ```
 
 The coefficients allow experiments with different operational priorities.
@@ -329,7 +329,7 @@ The dashboard should report common metrics for all algorithms, including:
 | --- | --- |
 | Total assigned containers | Confirms coverage |
 | Slot utilization | Measures vessel space usage |
-| Lateral CG | Validates port-starboard balance |
+| Lateral CG | Validates port-side/starboard-side balance |
 | Longitudinal CG | Validates bow-stern balance |
 | Normalized vertical CG | Measures vertical loading quality |
 | Port-side and starboard-side weight | Provides intuitive balance reporting |
@@ -350,7 +350,7 @@ The application should support a port-by-port unloading simulation. For a select
 - Containers removed.
 - Extra rehandling movements required.
 - Updated horizontal center of gravity.
-- Updated port-starboard and bow-stern balance.
+- Updated port-side/starboard-side and bow-stern balance.
 - Updated space utilization.
 - Visual changes in the vessel layout.
 
@@ -513,7 +513,7 @@ Metrics should be tested for consistency:
 - Lateral CG.
 - Longitudinal CG.
 - Normalized vertical CG.
-- Port-starboard balance.
+- Port-side/starboard-side balance.
 - Bow-stern balance.
 - Vertical penalty.
 - Rehandling proxy.
