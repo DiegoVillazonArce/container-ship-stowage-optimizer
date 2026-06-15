@@ -525,9 +525,11 @@ Invalid data should fail with clear messages, including incomplete files, duplic
 
 ---
 
-## 18. Planned Developer Setup
+## 18. Development Setup
 
-The following commands describe the intended setup once the initial implementation is available. At the current blueprint stage, files such as `requirements.txt`, `app/main.py`, and `tests/` may not exist yet.
+The project uses a local Python virtual environment and installs dependencies from `pyproject.toml`.
+
+The `.venv/` directory is intentionally ignored by Git. Each developer creates their own local environment after cloning the repository.
 
 ### Prerequisites
 
@@ -541,16 +543,24 @@ git clone https://github.com/DiegoVillazonArce/container-ship-stowage-optimizer.
 cd container-ship-stowage-optimizer
 ```
 
-### 2. Create and activate a virtual environment
+### 2. Create a virtual environment
 
 ```bash
 python -m venv .venv
 ```
 
-Windows:
+### 3. Activate the virtual environment
 
-```bash
-.venv\Scripts\activate
+Windows PowerShell:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+Windows Command Prompt:
+
+```cmd
+.venv\Scripts\activate.bat
 ```
 
 macOS / Linux:
@@ -559,23 +569,55 @@ macOS / Linux:
 source .venv/bin/activate
 ```
 
-### 3. Install dependencies
+After activation, the terminal prompt usually displays `(.venv)`.
+
+### 4. Install the project and development dependencies
+
+Upgrade `pip` inside the virtual environment:
 
 ```bash
-pip install -r requirements.txt
+python -m pip install --upgrade pip
 ```
 
-### 4. Run the Streamlit app
+Install the package in editable mode with development tools:
+
+```bash
+pip install -e ".[dev]"
+```
+
+This installs:
+
+- the local `stowage_optimizer` package in editable mode;
+- development dependencies such as `pytest`.
+
+Editable mode means source changes under `src/` are immediately reflected without reinstalling the package.
+
+### 5. Run tests
+
+```bash
+pytest
+```
+
+### 6. Deactivate the virtual environment
+
+```bash
+deactivate
+```
+
+### Notes for contributors
+
+- Do not commit `.venv/`; it is a local machine-specific environment.
+- If new runtime dependencies are added, declare them in `pyproject.toml`.
+- If new development-only tools are added, declare them under `[project.optional-dependencies]` in the `dev` extra.
+- Contributors may install dependencies globally, but using a virtual environment is recommended to avoid conflicts between projects.
+
+### Future Streamlit app
 
 ```bash
 streamlit run app/main.py
 ```
 
-### 5. Run tests
-
-```bash
-pytest tests/ -v
-```
+The Streamlit command will be available once the application module is added.
 
 ---
 
