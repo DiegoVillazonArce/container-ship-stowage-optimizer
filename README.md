@@ -1,10 +1,12 @@
 # Container Ship Stowage Optimizer
 
-**Status:** Project blueprint completed. Implementation not yet started.
+**Status:** Phase 1 completed. Core domain models, validation, a small example instance, and unit tests are implemented. Phase 2, the metrics engine, is next.
 
 ## Current Repository State
 
-This repository currently contains the project planning documentation. Source code, example datasets, automated tests, and the Streamlit interface will be added incrementally during implementation.
+This repository contains the project planning documentation plus the first implementation increment. The current Python package includes vessel slots and normalized coordinates, container and route models, problem instances, pre-solver validation, a small hand-checkable example, and automated tests.
+
+The detailed implementation plan is maintained in [ROADMAP.md](./ROADMAP.md). The roadmap is the source of truth for phase boundaries.
 
 ## 1. Executive Summary
 
@@ -400,32 +402,22 @@ Larger scenarios should be handled with greedy construction, repair heuristics, 
 
 ## 14. Roadmap
 
-### Phase 1: Optimization Core MVP
+The detailed phase plan is maintained in [ROADMAP.md](./ROADMAP.md).
 
-- Define vessel grid and coordinate model.
-- Load container data from CSV.
-- Implement input validation.
-- Implement one initial solver: greedy heuristic or MILP.
-- Enforce unique assignment, slot capacity, stack continuity, reefer compatibility, and simplified CG constraints.
-- Produce console or tabular output.
+Current roadmap status:
 
-### Phase 2: Complete Model
+| Phase | Name | Status |
+| --- | --- | --- |
+| Phase 1 | Core Domain Model | Completed |
+| Phase 2 | Metrics Engine | Next |
+| Phase 3 | Greedy Baseline Solver | Planned |
+| Phase 4 | MILP Solver | Planned |
+| Phase 5 | Genetic Algorithm | Planned |
+| Phase 6 | Streamlit Interface | Planned |
+| Phase 7 | 3D Visualization and Unloading Simulation | Planned |
+| Phase 8 | Testing, Benchmarking, and Documentation | Planned |
 
-- Add incompatible cargo separation.
-- Add stack weight limits.
-- Add vertical CG penalty.
-- Add rehandling proxy and real rehandling evaluation.
-- Implement a second solver for comparison.
-- Add standardized metrics across algorithms.
-
-### Phase 3: Streamlit Application
-
-- Build interactive parameter controls.
-- Add file upload and validation feedback.
-- Add dashboard metrics.
-- Add Plotly 3D vessel visualization.
-- Add unloading simulation by port.
-- Add scenario export and optional persistence.
+Implementation tasks such as CSV upload, solver construction, dashboard output, and visualization are intentionally scheduled after the domain model foundation.
 
 ---
 
@@ -460,6 +452,7 @@ container-ship-stowage-optimizer/
 |       |   |-- ship.py         # Vessel grid and coordinates
 |       |   |-- container.py    # Container model and loading logic
 |       |   |-- validation.py   # Input and feasibility pre-checks
+|       |   |-- solution.py     # Common stowage assignment contract
 |       |   `-- metrics.py      # CG, balance, utilization, rehandling
 |       |-- solvers/
 |       |   |-- base.py         # Common solver interface
