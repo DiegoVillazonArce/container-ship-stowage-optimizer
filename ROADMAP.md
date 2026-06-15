@@ -32,24 +32,24 @@ Create the foundational Python data model for vessels, slots, containers, routes
 
 ### Tasks
 
-- [ ] Create `Slot` model.
-- [ ] Create `Ship` model.
-- [ ] Create `Container` model.
-- [ ] Create `Route` or port sequence model.
-- [ ] Create `ProblemInstance` model.
-- [ ] Generate bay-row-tier grid.
-- [ ] Add normalized coordinates `x`, `y`, and `z`.
-- [ ] Add reefer-capable slot metadata.
-- [ ] Add container fields: `id`, `weight`, `destination_port`, and `type`.
-- [ ] Add supported container types: `Normal`, `Reefer`, `Flammable`, and `Oxidizer`.
-- [ ] Add input validation for duplicate IDs.
-- [ ] Add input validation for missing or invalid weights.
-- [ ] Add input validation for unknown container types.
-- [ ] Add input validation for destination ports missing from the route.
-- [ ] Add input validation for more containers than available slots.
-- [ ] Add input validation for more reefer containers than reefer-capable slots.
-- [ ] Create small sample instance, such as `6 x 4 x 4`.
-- [ ] Add unit tests.
+- [x] Create `Slot` model.
+- [x] Create `Ship` model.
+- [x] Create `Container` model.
+- [x] Create `Route` or port sequence model.
+- [x] Create `ProblemInstance` model.
+- [x] Generate bay-row-tier grid.
+- [x] Add normalized coordinates `x`, `y`, and `z`.
+- [x] Add reefer-capable slot metadata.
+- [x] Add container fields: `id`, `weight`, `destination_port`, and `type`.
+- [x] Add supported container types: `Normal`, `Reefer`, `Flammable`, and `Oxidizer`.
+- [x] Add input validation for duplicate IDs.
+- [x] Add input validation for missing or invalid weights.
+- [x] Add input validation for unknown container types.
+- [x] Add input validation for destination ports missing from the route.
+- [x] Add input validation for more containers than available slots.
+- [x] Add input validation for more reefer containers than reefer-capable slots.
+- [x] Create small sample instance, such as `6 x 4 x 4`.
+- [x] Add unit tests.
 
 ### Definition of Done
 
