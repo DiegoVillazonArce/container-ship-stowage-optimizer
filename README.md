@@ -1,10 +1,10 @@
 # Container Ship Stowage Optimizer
 
-**Status:** Phase 1 completed. Core domain models, validation, a small example instance, and unit tests are implemented. Phase 2, the metrics engine, is next.
+**Status:** Phases 1 and 2 completed. Core domain models, validation, a small example instance, and the common metrics engine are implemented and unit-tested. Phase 3, the greedy baseline solver, is next.
 
 ## Current Repository State
 
-This repository contains the project planning documentation plus the first implementation increment. The current Python package includes vessel slots and normalized coordinates, container and route models, problem instances, pre-solver validation, a small hand-checkable example, and automated tests.
+This repository contains the project planning documentation plus the first two implementation increments. The current Python package includes vessel slots and normalized coordinates, container and route models, problem instances, pre-solver validation, a small hand-checkable example, a common metrics engine (weight, utilization, center-of-gravity moments, side and end balance, constraint-violation counts, and real rehandling by simulated unloading), and automated tests.
 
 The detailed implementation plan is maintained in [ROADMAP.md](./ROADMAP.md). The roadmap is the source of truth for phase boundaries.
 
@@ -409,8 +409,8 @@ Current roadmap status:
 | Phase | Name | Status |
 | --- | --- | --- |
 | Phase 1 | Core Domain Model | Completed |
-| Phase 2 | Metrics Engine | Next |
-| Phase 3 | Greedy Baseline Solver | Planned |
+| Phase 2 | Metrics Engine | Completed |
+| Phase 3 | Greedy Baseline Solver | Next |
 | Phase 4 | MILP Solver | Planned |
 | Phase 5 | Genetic Algorithm | Planned |
 | Phase 6 | Streamlit Interface | Planned |
@@ -472,7 +472,7 @@ The solver interface should allow algorithms to be swapped without changing the 
 
 ```python
 solution = solver.solve(instance)
-metrics = evaluate_solution(solution)
+metrics = evaluate_solution(instance, solution)
 ```
 
 ---

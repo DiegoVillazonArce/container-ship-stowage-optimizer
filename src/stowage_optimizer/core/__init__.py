@@ -1,6 +1,7 @@
 """Core domain models for the stowage optimizer."""
 
 from stowage_optimizer.core.container import Container, ContainerType
+from stowage_optimizer.core.metrics import StowageMetrics, evaluate_solution
 from stowage_optimizer.core.problem import ProblemInstance
 from stowage_optimizer.core.route import Route
 from stowage_optimizer.core.ship import Ship, Slot
@@ -11,6 +12,8 @@ __all__ = [
     "Container",
     "ContainerType",
     "ProblemInstance",
+    "StowageMetrics",
+    "evaluate_solution",
     "Route",
     "Ship",
     "Slot",

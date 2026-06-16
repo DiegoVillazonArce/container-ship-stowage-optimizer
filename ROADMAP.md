@@ -74,23 +74,23 @@ Implement common metrics that every solver can use for evaluation and comparison
 
 ### Tasks
 
-- [ ] Create `metrics.py`.
-- [ ] Implement total weight calculation.
-- [ ] Implement slot utilization calculation.
-- [ ] Implement lateral moment calculation.
-- [ ] Implement longitudinal moment calculation.
-- [ ] Implement `CG_y`.
-- [ ] Implement `CG_x`.
-- [ ] Implement normalized `CG_z`.
-- [ ] Implement port-side and starboard-side weight reporting.
-- [ ] Implement bow and stern weight reporting.
-- [ ] Implement horizontal CG tolerance checks.
-- [ ] Implement reefer violation checks.
-- [ ] Implement stack continuity violation checks.
-- [ ] Implement incompatible cargo violation checks.
-- [ ] Implement real rehandling simulation by route order.
-- [ ] Implement final metrics object or dictionary.
-- [ ] Add unit tests for hand-checkable layouts.
+- [x] Create `metrics.py`.
+- [x] Implement total weight calculation.
+- [x] Implement slot utilization calculation.
+- [x] Implement lateral moment calculation.
+- [x] Implement longitudinal moment calculation.
+- [x] Implement `CG_y`.
+- [x] Implement `CG_x`.
+- [x] Implement normalized `CG_z`.
+- [x] Implement port-side and starboard-side weight reporting.
+- [x] Implement bow and stern weight reporting.
+- [x] Implement horizontal CG tolerance checks.
+- [x] Implement reefer violation checks.
+- [x] Implement stack continuity violation checks.
+- [x] Implement incompatible cargo violation checks.
+- [x] Implement real rehandling simulation by route order.
+- [x] Implement final metrics object or dictionary.
+- [x] Add unit tests for hand-checkable layouts.
 
 ### Definition of Done
 
