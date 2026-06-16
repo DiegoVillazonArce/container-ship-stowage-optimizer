@@ -115,21 +115,21 @@ Create a fast constructive solver that produces an initial baseline solution and
 
 ### Tasks
 
-- [ ] Create common solver interface.
-- [ ] Create `GreedySolver`.
-- [ ] Sort containers by weight and constraint priority.
-- [ ] Generate candidate slots for each container.
-- [ ] Enforce slot capacity during construction.
-- [ ] Enforce stack continuity during construction.
-- [ ] Enforce reefer compatibility during construction.
-- [ ] Add scoring for horizontal CG impact.
-- [ ] Add scoring for vertical placement.
-- [ ] Add scoring for rehandling risk.
-- [ ] Add simplified incompatible cargo checks.
-- [ ] Add optional swap-based repair.
-- [ ] Return solution status: feasible, repaired, or infeasible.
-- [ ] Report runtime.
-- [ ] Add unit tests with small instances.
+- [x] Create common solver interface.
+- [x] Create `GreedySolver`.
+- [x] Sort containers by weight and constraint priority.
+- [x] Generate candidate slots for each container.
+- [x] Enforce slot capacity during construction.
+- [x] Enforce stack continuity during construction.
+- [x] Enforce reefer compatibility during construction.
+- [x] Add scoring for horizontal CG impact.
+- [x] Add scoring for vertical placement.
+- [x] Add scoring for rehandling risk.
+- [x] Add simplified incompatible cargo checks.
+- [x] Add optional swap-based repair.
+- [x] Return solution status: feasible, repaired, or infeasible.
+- [x] Report runtime.
+- [x] Add unit tests with small instances.
 
 ### Definition of Done
 

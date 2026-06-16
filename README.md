@@ -1,10 +1,10 @@
 # Container Ship Stowage Optimizer
 
-**Status:** Phases 1 and 2 completed. Core domain models, validation, a small example instance, and the common metrics engine are implemented and unit-tested. Phase 3, the greedy baseline solver, is next.
+**Status:** Phases 1 through 3 completed. Core domain models, validation, a small example instance, the common metrics engine, and the greedy baseline solver are implemented and unit-tested. Phase 4, the MILP solver, is next.
 
 ## Current Repository State
 
-This repository contains the project planning documentation plus the first two implementation increments. The current Python package includes vessel slots and normalized coordinates, container and route models, problem instances, pre-solver validation, a small hand-checkable example, a common metrics engine (weight, utilization, center-of-gravity moments, side and end balance, constraint-violation counts, and real rehandling by simulated unloading), and automated tests.
+This repository contains the project planning documentation plus the first three implementation increments. The current Python package includes vessel slots and normalized coordinates, container and route models, problem instances, pre-solver validation, a small hand-checkable example, a common metrics engine (weight, utilization, center-of-gravity moments, side and end balance, constraint-violation counts, and real rehandling by simulated unloading), a common solver interface, the greedy baseline solver with optional swap-based repair, and automated tests.
 
 The detailed implementation plan is maintained in [ROADMAP.md](./ROADMAP.md). The roadmap is the source of truth for phase boundaries.
 
@@ -410,8 +410,8 @@ Current roadmap status:
 | --- | --- | --- |
 | Phase 1 | Core Domain Model | Completed |
 | Phase 2 | Metrics Engine | Completed |
-| Phase 3 | Greedy Baseline Solver | Next |
-| Phase 4 | MILP Solver | Planned |
+| Phase 3 | Greedy Baseline Solver | Completed |
+| Phase 4 | MILP Solver | Next |
 | Phase 5 | Genetic Algorithm | Planned |
 | Phase 6 | Streamlit Interface | Planned |
 | Phase 7 | 3D Visualization and Unloading Simulation | Planned |
@@ -471,8 +471,9 @@ container-ship-stowage-optimizer/
 The solver interface should allow algorithms to be swapped without changing the Streamlit layer:
 
 ```python
-solution = solver.solve(instance)
-metrics = evaluate_solution(instance, solution)
+result = solver.solve(instance)
+solution = result.solution
+metrics = result.metrics
 ```
 
 ---
