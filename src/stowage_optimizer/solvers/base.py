@@ -24,16 +24,28 @@ class SolverStatus(StrEnum):
     FEASIBLE = "feasible"
     REPAIRED = "repaired"
     INFEASIBLE = "infeasible"
+    NOT_SOLVED = "not_solved"
 
 
 @dataclass(frozen=True, slots=True)
 class SolverResult:
-    """A solver's produced solution together with its evaluation."""
+    """A solver's produced solution together with its evaluation.
+
+    ``objective_value`` and ``gap`` are optional and only populated by exact
+    solvers. Heuristic solvers leave them as ``None`` because their internal
+    scores are not comparable across algorithms (see DESIGN.md section 13).
+    ``gap`` may also stay ``None`` when the underlying MILP backend does not
+    expose an optimality gap. ``solver_status_detail`` preserves the backend's
+    native status string when a solver can provide one.
+    """
 
     solution: StowageSolution
     status: SolverStatus
     runtime_seconds: float
     metrics: StowageMetrics
+    objective_value: float | None = None
+    gap: float | None = None
+    solver_status_detail: str | None = None
 
     @property
     def is_feasible(self) -> bool:

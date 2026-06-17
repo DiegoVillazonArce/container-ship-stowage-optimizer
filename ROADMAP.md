@@ -153,25 +153,25 @@ Implement the exact optimization reference for small instances using a Mixed Int
 
 ### Tasks
 
-- [ ] Choose MILP library, such as OR-Tools, PuLP, or Pyomo.
-- [ ] Create `MILPSolver`.
-- [ ] Define binary variables `x[c, p]`.
-- [ ] Add unique assignment constraints.
-- [ ] Add slot capacity constraints.
-- [ ] Add stack continuity constraints.
-- [ ] Add reefer compatibility constraints.
-- [ ] Add bay-level binary variables for flammable cargo.
-- [ ] Add bay-level binary variables for oxidizer cargo.
-- [ ] Add minimum bay-distance separation constraints.
-- [ ] Add horizontal CG moment constraints.
-- [ ] Add auxiliary variables for absolute lateral CG deviation.
-- [ ] Add auxiliary variables for absolute longitudinal CG deviation.
-- [ ] Add normalized vertical CG penalty.
-- [ ] Add linear rehandling proxy.
-- [ ] Add objective weights.
-- [ ] Add solver time limit configuration.
-- [ ] Return status, objective value, runtime, and gap when available.
-- [ ] Add tests for infeasible and feasible small instances.
+- [x] Choose MILP library, such as OR-Tools, PuLP, or Pyomo.
+- [x] Create `MILPSolver`.
+- [x] Define binary variables `x[c, p]`.
+- [x] Add unique assignment constraints.
+- [x] Add slot capacity constraints.
+- [x] Add stack continuity constraints.
+- [x] Add reefer compatibility constraints.
+- [x] Add bay-level binary variables for flammable cargo.
+- [x] Add bay-level binary variables for oxidizer cargo.
+- [x] Add minimum bay-distance separation constraints.
+- [x] Add horizontal CG moment constraints.
+- [x] Add auxiliary variables for absolute lateral CG deviation.
+- [x] Add auxiliary variables for absolute longitudinal CG deviation.
+- [x] Add normalized vertical CG penalty.
+- [x] Add linear rehandling proxy.
+- [x] Add objective weights.
+- [x] Add solver time limit configuration.
+- [x] Return status, objective value, runtime, and gap when available.
+- [x] Add tests for infeasible and feasible small instances.
 
 ### Definition of Done
 

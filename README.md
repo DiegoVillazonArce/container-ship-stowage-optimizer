@@ -1,10 +1,10 @@
 # Container Ship Stowage Optimizer
 
-**Status:** Phases 1 through 3 completed. Core domain models, validation, a small example instance, the common metrics engine, and the greedy baseline solver are implemented and unit-tested. Phase 4, the MILP solver, is next.
+**Status:** Phases 1 through 4 completed. Core domain models, validation, a small example instance, the common metrics engine, the greedy baseline solver, and the exact MILP reference solver are implemented and unit-tested. Phase 5, the genetic algorithm, is next.
 
 ## Current Repository State
 
-This repository contains the project planning documentation plus the first three implementation increments. The current Python package includes vessel slots and normalized coordinates, container and route models, problem instances, pre-solver validation, a small hand-checkable example, a common metrics engine (weight, utilization, center-of-gravity moments, side and end balance, constraint-violation counts, and real rehandling by simulated unloading), a common solver interface, the greedy baseline solver with optional swap-based repair, and automated tests.
+This repository contains the project planning documentation plus the first four implementation increments. The current Python package includes vessel slots and normalized coordinates, container and route models, problem instances, pre-solver validation, a small hand-checkable example, a common metrics engine (weight, utilization, center-of-gravity moments, side and end balance, constraint-violation counts, and real rehandling by simulated unloading), a common solver interface, the greedy baseline solver with optional swap-based repair, the MILP exact reference solver (PuLP/CBC) enforcing the hard constraints and minimizing the linear objective, and automated tests.
 
 The detailed implementation plan is maintained in [ROADMAP.md](./ROADMAP.md). The roadmap is the source of truth for phase boundaries.
 
@@ -411,8 +411,8 @@ Current roadmap status:
 | Phase 1 | Core Domain Model | Completed |
 | Phase 2 | Metrics Engine | Completed |
 | Phase 3 | Greedy Baseline Solver | Completed |
-| Phase 4 | MILP Solver | Next |
-| Phase 5 | Genetic Algorithm | Planned |
+| Phase 4 | MILP Solver | Completed |
+| Phase 5 | Genetic Algorithm | Next |
 | Phase 6 | Streamlit Interface | Planned |
 | Phase 7 | 3D Visualization and Unloading Simulation | Planned |
 | Phase 8 | Testing, Benchmarking, and Documentation | Planned |
