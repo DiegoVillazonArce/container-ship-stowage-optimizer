@@ -196,23 +196,23 @@ Create a metaheuristic solver for larger instances where MILP may become too exp
 
 ### Tasks
 
-- [ ] Create `GeneticSolver`.
-- [ ] Define chromosome representation.
-- [ ] Generate initial population.
-- [ ] Add feasibility-aware initialization when possible.
-- [ ] Implement fitness evaluation.
-- [ ] Include horizontal CG deviation in fitness.
-- [ ] Include normalized `CG_z` in fitness.
-- [ ] Include real rehandling simulation in fitness.
-- [ ] Include penalty for constraint violations.
-- [ ] Implement selection.
-- [ ] Implement crossover.
-- [ ] Implement mutation.
-- [ ] Implement repair for duplicate slots and missing containers.
-- [ ] Implement stopping criteria.
-- [ ] Report best solution, runtime, and generation count.
-- [ ] Add reproducible random seed configuration.
-- [ ] Add tests for encoding, decoding, and repair logic.
+- [x] Create `GeneticSolver`.
+- [x] Define chromosome representation.
+- [x] Generate initial population.
+- [x] Add feasibility-aware initialization when possible.
+- [x] Implement fitness evaluation.
+- [x] Include horizontal CG deviation in fitness.
+- [x] Include normalized `CG_z` in fitness.
+- [x] Include real rehandling simulation in fitness.
+- [x] Include penalty for constraint violations.
+- [x] Implement selection.
+- [x] Implement crossover.
+- [x] Implement mutation.
+- [x] Implement repair for duplicate slots and missing containers.
+- [x] Implement stopping criteria.
+- [x] Report best solution, runtime, and generation count.
+- [x] Add reproducible random seed configuration.
+- [x] Add tests for encoding, decoding, and repair logic.
 
 ### Definition of Done
 
