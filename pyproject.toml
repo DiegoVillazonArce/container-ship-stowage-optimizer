@@ -10,6 +10,8 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "pulp>=2.7",
+    "streamlit>=1.30",
+    "pandas>=2.0",
 ]
 
 [project.optional-dependencies]
@@ -19,7 +21,9 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+# ``app`` is on the path so the Streamlit-free helpers in ``app/app_helpers.py``
+# can be imported and unit-tested without launching Streamlit.
+pythonpath = ["src", "app"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

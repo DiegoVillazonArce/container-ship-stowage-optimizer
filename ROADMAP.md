@@ -236,23 +236,23 @@ Build a simple interactive interface for configuring scenarios, running solvers,
 
 ### Tasks
 
-- [ ] Create `app/main.py`.
-- [ ] Add Streamlit sidebar.
-- [ ] Add vessel dimension inputs.
-- [ ] Add reefer slot or reefer bay configuration.
-- [ ] Add CSV upload.
-- [ ] Add route sequence input.
-- [ ] Add algorithm selector.
-- [ ] Add CG tolerance controls.
-- [ ] Add objective weight controls.
-- [ ] Add solver time limit controls.
-- [ ] Add run optimization button.
-- [ ] Display validation errors.
-- [ ] Display solution status.
-- [ ] Display common KPI metrics.
-- [ ] Display final stowage plan table.
-- [ ] Display algorithm comparison table.
-- [ ] Add session state for latest scenario and solution.
+- [x] Create `app/main.py`.
+- [x] Add Streamlit sidebar.
+- [x] Add vessel dimension inputs.
+- [x] Add reefer slot or reefer bay configuration.
+- [x] Add CSV upload.
+- [x] Add route sequence input.
+- [x] Add algorithm selector.
+- [x] Add CG tolerance controls.
+- [x] Add objective weight controls.
+- [x] Add solver time limit controls.
+- [x] Add run optimization button.
+- [x] Display validation errors.
+- [x] Display solution status.
+- [x] Display common KPI metrics.
+- [x] Display final stowage plan table.
+- [x] Display algorithm comparison table.
+- [x] Add session state for latest scenario and solution.
 
 ### Definition of Done
 

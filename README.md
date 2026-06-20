@@ -1,6 +1,6 @@
 # Container Ship Stowage Optimizer
 
-**Status:** Phases 1 through 5 completed. Core domain models, validation, a small example instance, the common metrics engine, the greedy baseline solver, the exact MILP reference solver, and the genetic algorithm solver are implemented and unit-tested. Phase 6, the Streamlit interface, is next.
+**Status:** Phases 1 through 6 completed. Core domain models, validation, a small example instance, the common metrics engine, the greedy baseline solver, the exact MILP reference solver, the genetic algorithm solver, and the Streamlit interface are implemented and unit-tested. Phase 7, the 3D visualization and unloading simulation, is next.
 
 ## Current Repository State
 
@@ -413,8 +413,8 @@ Current roadmap status:
 | Phase 3 | Greedy Baseline Solver | Completed |
 | Phase 4 | MILP Solver | Completed |
 | Phase 5 | Genetic Algorithm | Completed |
-| Phase 6 | Streamlit Interface | Next |
-| Phase 7 | 3D Visualization and Unloading Simulation | Planned |
+| Phase 6 | Streamlit Interface | Completed |
+| Phase 7 | 3D Visualization and Unloading Simulation | Next |
 | Phase 8 | Testing, Benchmarking, and Documentation | Planned |
 
 Implementation tasks such as CSV upload, solver construction, dashboard output, and visualization are intentionally scheduled after the domain model foundation.
@@ -605,13 +605,21 @@ deactivate
 - If new development-only tools are added, declare them under `[project.optional-dependencies]` in the `dev` extra.
 - Contributors may install dependencies globally, but using a virtual environment is recommended to avoid conflicts between projects.
 
-### Future Streamlit app
+### Streamlit app
 
 ```bash
 streamlit run app/main.py
 ```
 
-The Streamlit command will be available once the application module is added.
+The interface (Phase 6) lets you configure the vessel grid, reefer slots, route,
+and objective weights, upload a container CSV (columns `id`, `weight`,
+`destination_port`, `type`) or use the built-in example, run the Greedy, MILP,
+and Genetic solvers, and inspect KPIs, the final stowage plan, and an algorithm
+comparison table. Validation errors are reported before any solver runs.
+
+The CSV `type` column accepts `Normal`, `Reefer`, `Flammable`, or `Oxidizer`.
+The 3D visualization and the port-by-port unloading simulation are scheduled for
+Phase 7 and are not part of this interface yet.
 
 ---
 
