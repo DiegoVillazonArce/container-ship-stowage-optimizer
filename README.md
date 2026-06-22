@@ -1,10 +1,10 @@
 # Container Ship Stowage Optimizer
 
-**Status:** Phases 1 through 6 completed. Core domain models, validation, a small example instance, the common metrics engine, the greedy baseline solver, the exact MILP reference solver, the genetic algorithm solver, and the Streamlit interface are implemented. The core package and Streamlit-independent app helpers are unit-tested. Phase 7, the 3D visualization and unloading simulation, is next.
+**Status:** Phases 1 through 7 completed. Core domain models, validation, a small example instance, the common metrics engine, the greedy baseline solver, the exact MILP reference solver, the genetic algorithm solver, the Streamlit interface, Plotly 3D visualization, and port-by-port unloading simulation are implemented. The core package, Streamlit-independent app helpers, and visualization helpers are unit-tested. Phase 8 testing, benchmarking, and documentation hardening is next.
 
 ## Current Repository State
 
-This repository contains the project planning documentation plus the first six implementation increments. The current Python package includes vessel slots and normalized coordinates, container and route models, problem instances, pre-solver validation, a small hand-checkable example, a common metrics engine (weight, utilization, center-of-gravity moments, side and end balance, constraint-violation counts, and real rehandling by simulated unloading), a common solver interface, the greedy baseline solver with optional swap-based repair, the MILP exact reference solver (PuLP/CBC) enforcing the hard constraints and minimizing the linear objective, the genetic algorithm metaheuristic solver, the Streamlit interface, and automated tests.
+This repository contains the project planning documentation plus the first seven implementation increments. The current Python package includes vessel slots and normalized coordinates, container and route models, problem instances, pre-solver validation, a small hand-checkable example, a common metrics engine (weight, utilization, center-of-gravity moments, side and end balance, constraint-violation counts, and real rehandling by simulated unloading), a common solver interface, the greedy baseline solver with optional swap-based repair, the MILP exact reference solver (PuLP/CBC) enforcing the hard constraints and minimizing the linear objective, the genetic algorithm metaheuristic solver, the Streamlit interface with Plotly 3D visualization and unloading simulation, and automated tests.
 
 The detailed implementation plan is maintained in [ROADMAP.md](./ROADMAP.md). The roadmap is the source of truth for phase boundaries.
 
@@ -301,12 +301,12 @@ The planned user interface will be built with Streamlit to keep the project full
 
 - Operational KPIs.
 - Final stowage plan table.
-- 3D vessel visualization (planned, Phase 7).
-- Port-by-port unloading simulation (planned, Phase 7).
+- 3D vessel visualization.
+- Port-by-port unloading simulation.
 - Algorithm comparison report.
 - Feasibility and constraint violation diagnostics.
 
-Plotly is planned for the 3D visualization layer.
+Plotly powers the 3D visualization layer.
 
 ### Streamlit Components
 
@@ -416,8 +416,8 @@ Current roadmap status:
 | Phase 4 | MILP Solver | Completed |
 | Phase 5 | Genetic Algorithm | Completed |
 | Phase 6 | Streamlit Interface | Completed |
-| Phase 7 | 3D Visualization and Unloading Simulation | Next |
-| Phase 8 | Testing, Benchmarking, and Documentation | Planned |
+| Phase 7 | 3D Visualization and Unloading Simulation | Completed |
+| Phase 8 | Testing, Benchmarking, and Documentation | Next |
 
 Implementation tasks such as CSV upload, solver construction, dashboard output, and visualization are intentionally scheduled after the domain model foundation.
 
@@ -464,7 +464,7 @@ container-ship-stowage-optimizer/
 |       |   |-- greedy.py       # Greedy constructive heuristic
 |       |   |-- milp.py         # MILP formulation
 |       |   `-- genetic.py      # Genetic algorithm
-|       `-- viz/               # (planned, Phase 7 - not yet implemented)
+|       `-- viz/
 |           `-- plot3d.py       # Plotly visualization helpers
 |-- tests/
 |   `-- test_*.py
@@ -616,15 +616,14 @@ deactivate
 streamlit run app/main.py
 ```
 
-The interface (Phase 6) lets you configure the vessel grid, reefer slots, route,
+The interface lets you configure the vessel grid, reefer slots, route,
 and objective weights, upload a container CSV (columns `id`, `weight`,
 `destination_port`, `type`) or use the built-in example, run the Greedy, MILP,
-and Genetic solvers, and inspect KPIs, the final stowage plan, and an algorithm
-comparison table. Validation errors are reported before any solver runs.
+and Genetic solvers, and inspect KPIs, the final stowage plan, a Plotly 3D
+stowage view, port-by-port unloading simulation, and an algorithm comparison
+table. Validation errors are reported before any solver runs.
 
 The CSV `type` column accepts `Normal`, `Reefer`, `Flammable`, or `Oxidizer`.
-The 3D visualization and the port-by-port unloading simulation are scheduled for
-Phase 7 and are not part of this interface yet.
 
 ---
 
@@ -637,8 +636,8 @@ This project combines:
 - Operations research.
 - Maritime logistics.
 - Heuristic and metaheuristic algorithms.
-- Simulation of unloading operations (planned, Phase 7).
-- 3D data visualization (planned, Phase 7).
+- Simulation of unloading operations.
+- 3D data visualization.
 - Python application development.
 
 Its main value is translating a real industrial logistics problem into an implementable academic model that remains rigorous, explainable, and suitable for experimental algorithm comparison.
@@ -649,7 +648,7 @@ Its main value is translating a real industrial logistics problem into an implem
 
 **Container Ship Stowage Optimization System**
 
-Developed a Python-based optimization system for container ship stowage using MILP, greedy heuristics, and genetic algorithms. The system incorporates horizontal center-of-gravity constraints, stacking rules, reefer slot requirements, compact incompatible cargo separation, vertical center-of-gravity penalties, and multi-port unloading costs, with an interactive Streamlit dashboard (3D Plotly visualization and unloading simulation planned for Phase 7).
+Developed a Python-based optimization system for container ship stowage using MILP, greedy heuristics, and genetic algorithms. The system incorporates horizontal center-of-gravity constraints, stacking rules, reefer slot requirements, compact incompatible cargo separation, vertical center-of-gravity penalties, and multi-port unloading costs, with an interactive Streamlit dashboard, Plotly 3D stowage visualization, and port-by-port unloading simulation.
 
 ---
 

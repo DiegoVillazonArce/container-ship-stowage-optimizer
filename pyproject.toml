@@ -12,6 +12,7 @@ dependencies = [
     "pulp>=3,<4",
     "streamlit>=1.30",
     "pandas>=2.0",
+    "plotly>=5.20",
 ]
 
 [project.optional-dependencies]

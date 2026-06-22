@@ -276,19 +276,19 @@ Add Plotly-based 3D visualization and port-by-port unloading analysis.
 
 ### Tasks
 
-- [ ] Create `viz/plot3d.py`.
-- [ ] Generate Plotly 3D container blocks or markers.
-- [ ] Color containers by destination port.
-- [ ] Add hover details for container ID, weight, port, type, and slot.
-- [ ] Add visual distinction for reefer containers.
-- [ ] Add visual distinction for dangerous cargo classes.
-- [ ] Add selected-port unloading simulation.
-- [ ] Identify containers removed at each port.
-- [ ] Identify temporary rehandling moves.
-- [ ] Recompute metrics after simulated unloading.
-- [ ] Display updated utilization.
-- [ ] Display updated CG metrics.
-- [ ] Add tests for unloading sequence logic.
+- [x] Create `viz/plot3d.py`.
+- [x] Generate Plotly 3D container blocks or markers.
+- [x] Color containers by destination port.
+- [x] Add hover details for container ID, weight, port, type, and slot.
+- [x] Add visual distinction for reefer containers.
+- [x] Add visual distinction for dangerous cargo classes.
+- [x] Add selected-port unloading simulation.
+- [x] Identify containers removed at each port.
+- [x] Identify temporary rehandling moves.
+- [x] Recompute metrics after simulated unloading.
+- [x] Display updated utilization.
+- [x] Display updated CG metrics.
+- [x] Add tests for unloading sequence logic.
 
 ### Definition of Done
 

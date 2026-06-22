@@ -1,17 +1,15 @@
-"""Streamlit interface for the Container Ship Stowage Optimizer (Phase 6).
+"""Streamlit interface for the Container Ship Stowage Optimizer.
 
 Run with::
 
     streamlit run app/main.py
 
 This is a deliberately simple, functional UI for configuring a scenario,
-loading or generating containers, running the Greedy / MILP / Genetic
-solvers, and inspecting tabular results and KPIs. It is a thin layer over the
-existing domain model and solvers; all reusable, testable logic lives in
-``app/app_helpers.py``.
-
-Scope note: 3D Plotly visualization and the port-by-port unloading simulation
-belong to Phase 7 and are intentionally **not** implemented here.
+loading or generating containers, running the Greedy / MILP / Genetic solvers,
+and inspecting KPIs, tabular results, 3D stowage views, and port-by-port
+unloading simulation. It is a thin layer over the existing domain model and
+solvers; reusable, testable support logic lives in ``app/app_helpers.py`` and
+``stowage_optimizer.viz``.
 """
 
 from __future__ import annotations
@@ -41,8 +39,11 @@ from stowage_optimizer.core.metrics import (
     DEFAULT_CG_TOLERANCE_LAT,
     DEFAULT_CG_TOLERANCE_LON,
     DEFAULT_MIN_INCOMPATIBLE_BAY_DISTANCE,
+    evaluate_solution,
+    simulate_unloading_events,
 )
 from stowage_optimizer.solvers import SolverStatus
+from stowage_optimizer.viz import build_stowage_figure
 
 # Defaults match ``create_small_example_instance`` so the internal example runs
 # cleanly with the form's initial values and no uploaded file.
@@ -59,6 +60,11 @@ CSV_TEMPLATE = (
     "C003,24.0,Spain,Flammable\n"
     "C004,16.5,Spain,Oxidizer\n"
 )
+
+COLOR_BY_OPTIONS = {
+    "Destination port": "destination_port",
+    "Cargo type": "cargo_type",
+}
 
 
 @dataclass(frozen=True)
@@ -323,6 +329,7 @@ def execute_run(config: SidebarConfig) -> None:
 
     payload: dict = {
         "summary": summary,
+        "params": config.params,
         "parse_errors": parse_errors,
         "validation_errors": [],
         "validation_warnings": [],
@@ -385,7 +392,11 @@ def render_kpis(result) -> None:
         extra[3].metric("Solver detail", result.solver_status_detail)
 
 
-def render_result_detail(entry: dict, instance: ProblemInstance) -> None:
+def render_result_detail(
+    entry: dict,
+    instance: ProblemInstance,
+    params: helpers.SolverParams,
+) -> None:
     if entry.get("skipped") is not None:
         st.warning(entry["skipped"])
         return
@@ -428,6 +439,130 @@ def render_result_detail(entry: dict, instance: ProblemInstance) -> None:
     else:
         st.info("No containers were assigned, so the stowage plan is empty.")
 
+    render_visualization_section(entry["algorithm"], instance, result, params)
+
+
+def render_visualization_section(
+    algorithm_label: str,
+    instance: ProblemInstance,
+    result,
+    params: helpers.SolverParams,
+) -> None:
+    """Render the Phase 7 3D figure and port-by-port unloading simulation."""
+    key_prefix = _streamlit_key("viz", algorithm_label)
+
+    st.markdown("**3D visualization**")
+    color_label = st.selectbox(
+        "Color containers by",
+        options=list(COLOR_BY_OPTIONS),
+        key=f"{key_prefix}_color_by",
+    )
+    color_by = COLOR_BY_OPTIONS[color_label]
+
+    figure = build_stowage_figure(
+        instance,
+        result.solution,
+        color_by=color_by,
+        title=f"{algorithm_label} stowage plan",
+    )
+    st.plotly_chart(figure, use_container_width=True)
+
+    st.markdown("**Unloading simulation**")
+    steps = simulate_unloading_events(instance, result.solution)
+    if not steps:
+        st.info("No route ports are available for unloading simulation.")
+        return
+
+    selected_port = st.selectbox(
+        "Simulation port",
+        options=[step.port for step in steps],
+        key=f"{key_prefix}_simulation_port",
+    )
+    selected_step = next(step for step in steps if step.port == selected_port)
+
+    simulation_metrics = evaluate_solution(
+        instance,
+        selected_step.remaining_assignment,
+        cg_tolerance_lon=params.cg_tolerance_lon,
+        cg_tolerance_lat=params.cg_tolerance_lat,
+        min_incompatible_bay_distance=params.min_incompatible_bay_distance,
+    )
+    remaining_count = len(selected_step.remaining_assignment.assignments)
+
+    top = st.columns(6)
+    top[0].metric("Utilization", f"{simulation_metrics.slot_utilization:.1%}")
+    top[1].metric("CG x", f"{simulation_metrics.cg_x:.3f}")
+    top[2].metric("CG y", f"{simulation_metrics.cg_y:.3f}")
+    top[3].metric("CG z", f"{simulation_metrics.cg_z_normalized:.3f}")
+    top[4].metric("Remaining", remaining_count)
+    top[5].metric("Rehandles", selected_step.rehandle_count)
+
+    movement_columns = st.columns(2)
+    _render_container_id_table(
+        movement_columns[0],
+        "Removed containers",
+        selected_step.removed_container_ids,
+        instance,
+    )
+    _render_container_id_table(
+        movement_columns[1],
+        "Rehandled containers",
+        selected_step.rehandled_container_ids,
+        instance,
+    )
+
+    remaining_figure = build_stowage_figure(
+        instance,
+        selected_step.remaining_assignment,
+        color_by=color_by,
+        highlighted_container_ids=selected_step.rehandled_container_ids,
+        title=f"After unloading {selected_step.port}",
+    )
+    st.plotly_chart(remaining_figure, use_container_width=True)
+
+
+def _render_container_id_table(
+    container,
+    title: str,
+    container_ids: tuple[str, ...],
+    instance: ProblemInstance,
+) -> None:
+    container.markdown(f"**{title}**")
+    rows = _container_rows(instance, container_ids)
+    if not rows:
+        container.caption("None.")
+        return
+    container.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+
+def _container_rows(
+    instance: ProblemInstance,
+    container_ids: tuple[str, ...],
+) -> list[dict[str, object]]:
+    containers_by_id = {container.id: container for container in instance.containers}
+    rows: list[dict[str, object]] = []
+    for container_id in container_ids:
+        item = containers_by_id.get(container_id)
+        if item is None:
+            raise ValueError(
+                "Unloading simulation referenced an unknown container ID: "
+                f"{container_id}."
+            )
+        rows.append(
+            {
+                "container_id": container_id,
+                "weight": item.weight,
+                "destination_port": item.destination_port,
+                "type": str(item.type),
+            }
+        )
+    return rows
+
+
+def _streamlit_key(*parts: str) -> str:
+    raw = "_".join(parts)
+    return "".join(character.lower() if character.isalnum() else "_" for character in raw)
+
 
 def render_results() -> None:
     payload = st.session_state.get("last_run")
@@ -461,6 +596,7 @@ def render_results() -> None:
 
     results = payload["results"]
     instance = payload["instance"]
+    params = payload.get("params", helpers.SolverParams())
 
     successful = [entry for entry in results if entry["result"] is not None]
     if len(successful) > 1:
@@ -476,12 +612,12 @@ def render_results() -> None:
 
     st.subheader("Results")
     if len(results) == 1:
-        render_result_detail(results[0], instance)
+        render_result_detail(results[0], instance, params)
     else:
         tabs = st.tabs([entry["algorithm"] for entry in results])
         for tab, entry in zip(tabs, results):
             with tab:
-                render_result_detail(entry, instance)
+                render_result_detail(entry, instance, params)
 
     _render_debug_expander(results)
 
@@ -506,7 +642,7 @@ def main() -> None:
     st.title("Container Ship Stowage Optimizer")
     st.caption(
         "Configure a scenario, run Greedy / MILP / Genetic solvers, and compare "
-        "their stowage plans and KPIs. (Phase 6 — tabular results only.)"
+        "their stowage plans, KPIs, 3D layout, and unloading simulation."
     )
 
     config = render_sidebar()
