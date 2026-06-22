@@ -8,9 +8,10 @@ UI layer in :mod:`main` wires these helpers into widgets.
 Domain validation (duplicate IDs, unknown types, destinations missing from the
 route, capacity, reefer capacity) is intentionally **not** duplicated here. It
 lives in :func:`stowage_optimizer.core.validation.validate_instance`, which the
-app runs after a :class:`ProblemInstance` is built. The parsers below only catch
-file-format problems (missing columns, blank cells, non-numeric weights, badly
-formatted slot triples) so the user gets clear, early feedback.
+app runs after a :class:`ProblemInstance` is built and solvers also run as an
+API safety check. The parsers below only catch file-format problems (missing
+columns, blank cells, non-numeric weights, badly formatted slot triples) so the
+user gets clear, early feedback.
 """
 
 from __future__ import annotations
@@ -46,6 +47,11 @@ _BOM = chr(0xFEFF)
 # Labels shown for selecting algorithms in the UI. The order is the run order.
 ALGORITHMS: tuple[str, ...] = ("Greedy", "MILP", "Genetic Algorithm")
 
+# Upper bound for MILP assignment binaries allowed from the Streamlit UI.
+# The MILP remains available from code for deliberate experiments; this guard
+# keeps an interactive run from accidentally building an oversized model.
+MILP_ASSIGNMENT_VARIABLE_LIMIT = 100_000
+
 # Simple presets for the genetic algorithm so users do not need to tune every
 # operator. "Balanced" mirrors :class:`GeneticConfig` defaults.
 GA_PRESETS: dict[str, dict[str, int]] = {
@@ -78,7 +84,10 @@ METRIC_LABELS: dict[str, str] = {
     "constraint_violations": "Total constraint violations",
     "real_rehandling": "Real rehandling moves",
     "real_rehandling_normalized": "Real rehandling (normalized)",
-    "is_feasible": "Structurally feasible",
+    "is_structurally_feasible": "Structurally feasible",
+    "cg_within_tolerance": "CG within tolerance",
+    "operationally_feasible": "Operationally feasible",
+    "is_feasible": "Operationally feasible",
 }
 
 
@@ -315,9 +324,9 @@ class SolverParams:
 
     The four common objective weights (``cg_lon``, ``cg_lat``, ``vertical``,
     ``rehandling``) map onto every solver. The remaining fields apply only where
-    the corresponding solver supports them; for example the greedy solver does
-    not take CG tolerances, so those only affect MILP feasibility and the GA
-    penalty term.
+    the corresponding solver supports them. Greedy uses CG tolerances when
+    evaluating the final plan; MILP enforces them as hard constraints; GA uses
+    them in the fitness penalty and final evaluation.
     """
 
     cg_lon: float = 1.0
@@ -348,6 +357,8 @@ def build_solver(algorithm: str, params: SolverParams) -> Solver:
                 vertical=params.vertical,
                 rehandling=params.rehandling,
             ),
+            cg_tolerance_lon=params.cg_tolerance_lon,
+            cg_tolerance_lat=params.cg_tolerance_lat,
             min_incompatible_bay_distance=params.min_incompatible_bay_distance,
         )
 
@@ -384,6 +395,30 @@ def build_solver(algorithm: str, params: SolverParams) -> Solver:
         )
 
     raise ValueError(f"Unknown algorithm: {algorithm!r}. Expected one of {ALGORITHMS}.")
+
+
+def milp_assignment_variable_upper_bound(instance: ProblemInstance) -> int:
+    """Return an upper bound for MILP container-slot assignment binaries."""
+    return len(instance.containers) * instance.ship.slot_count
+
+
+def milp_size_guard_message(
+    instance: ProblemInstance,
+    *,
+    max_assignment_variables: int = MILP_ASSIGNMENT_VARIABLE_LIMIT,
+) -> str | None:
+    """Return a user-facing skip reason when a MILP run is too large for the UI."""
+    estimate = milp_assignment_variable_upper_bound(instance)
+    if estimate <= max_assignment_variables:
+        return None
+
+    return (
+        "MILP was skipped because this scenario can create up to "
+        f"{estimate:,} assignment variables "
+        f"({len(instance.containers):,} containers x {instance.ship.slot_count:,} slots), "
+        f"above the Streamlit UI limit of {max_assignment_variables:,}. "
+        "Reduce the vessel size or container count, or run Greedy / Genetic Algorithm."
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -424,9 +459,11 @@ def assignment_rows(
 
 def metrics_table_rows(metrics_dict: dict[str, object]) -> list[dict[str, object]]:
     """Map a flat metrics dictionary to labelled ``metric``/``value`` rows."""
+    hidden_keys = {"is_feasible"} if "operationally_feasible" in metrics_dict else set()
     return [
         {"metric": METRIC_LABELS.get(key, key), "value": value}
         for key, value in metrics_dict.items()
+        if key not in hidden_keys
     ]
 
 
@@ -440,7 +477,9 @@ def comparison_row(algorithm_label: str, result: SolverResult) -> dict[str, obje
     return {
         "algorithm": algorithm_label,
         "status": str(result.status),
-        "feasible": result.is_feasible,
+        "structural_feasible": result.is_structurally_feasible,
+        "cg_ok": result.cg_within_tolerance,
+        "operational_feasible": result.is_feasible,
         "runtime_s": round(result.runtime_seconds, 4),
         "utilization": round(metrics.slot_utilization, 4),
         "cg_x": round(metrics.cg_x, 4),

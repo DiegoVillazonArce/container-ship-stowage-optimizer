@@ -11,10 +11,7 @@ existing domain model and solvers; all reusable, testable logic lives in
 ``app/app_helpers.py``.
 
 Scope note: 3D Plotly visualization and the port-by-port unloading simulation
-belong to Phase 7 and are intentionally **not** implemented here. The displayed
-``within tolerance`` flags for the Greedy solver use the metrics-engine default
-tolerances, because the greedy constructor does not take CG tolerances as input
-(they only affect MILP feasibility and the GA penalty term).
+belong to Phase 7 and are intentionally **not** implemented here.
 """
 
 from __future__ import annotations
@@ -45,6 +42,7 @@ from stowage_optimizer.core.metrics import (
     DEFAULT_CG_TOLERANCE_LON,
     DEFAULT_MIN_INCOMPATIBLE_BAY_DISTANCE,
 )
+from stowage_optimizer.solvers import SolverStatus
 
 # Defaults match ``create_small_example_instance`` so the internal example runs
 # cleanly with the form's initial values and no uploaded file.
@@ -295,7 +293,20 @@ def run_solvers(instance: ProblemInstance, config: SidebarConfig) -> list[dict]:
     """Run every selected solver, capturing failures gracefully."""
     results: list[dict] = []
     for algorithm in config.algorithms:
-        entry: dict = {"algorithm": algorithm, "result": None, "error": None, "traceback": None}
+        entry: dict = {
+            "algorithm": algorithm,
+            "result": None,
+            "error": None,
+            "traceback": None,
+            "skipped": None,
+        }
+        if algorithm == "MILP":
+            skip_reason = helpers.milp_size_guard_message(instance)
+            if skip_reason is not None:
+                entry["skipped"] = skip_reason
+                results.append(entry)
+                continue
+
         try:
             solver = helpers.build_solver(algorithm, config.params)
             entry["result"] = solver.solve(instance)
@@ -375,6 +386,10 @@ def render_kpis(result) -> None:
 
 
 def render_result_detail(entry: dict, instance: ProblemInstance) -> None:
+    if entry.get("skipped") is not None:
+        st.warning(entry["skipped"])
+        return
+
     if entry["error"] is not None:
         st.error(f"{entry['algorithm']} failed: {entry['error']}")
         return
@@ -382,6 +397,17 @@ def render_result_detail(entry: dict, instance: ProblemInstance) -> None:
     result = entry["result"]
     if result.is_feasible:
         st.success(f"Feasible solution ({result.status}).")
+    elif result.is_structurally_feasible and not result.cg_within_tolerance:
+        st.warning(
+            f"Structurally feasible, but CG tolerance exceeded ({result.status}). "
+            "Review CG x/y or relax the configured tolerances."
+        )
+    elif result.status == SolverStatus.NOT_SOLVED:
+        st.warning(
+            "MILP stopped before certifying optimality; no certified plan was "
+            "returned. Increase the time limit, or compare with the Greedy/GA "
+            "solvers."
+        )
     else:
         st.warning(
             f"No feasible solution ({result.status}). "

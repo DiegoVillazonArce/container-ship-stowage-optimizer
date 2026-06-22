@@ -8,7 +8,7 @@ unit-tested here.
 import pytest
 
 import app_helpers as helpers
-from stowage_optimizer.core import ContainerType
+from stowage_optimizer.core import Container, ContainerType, ProblemInstance, Route, Ship
 from stowage_optimizer.core.examples import create_small_example_instance
 from stowage_optimizer.solvers import GeneticSolver, GreedySolver, MILPSolver, SolverStatus
 
@@ -217,6 +217,28 @@ def test_solver_params_propagate_to_genetic_solver() -> None:
     assert solver._config.random_seed == 7
 
 
+def test_milp_size_guard_allows_small_ui_instances() -> None:
+    instance = create_small_example_instance()
+
+    assert helpers.milp_assignment_variable_upper_bound(instance) == 384
+    assert helpers.milp_size_guard_message(instance) is None
+
+
+def test_milp_size_guard_skips_oversized_ui_instances() -> None:
+    instance = ProblemInstance(
+        ship=Ship(bays=50, rows=50, tiers=50),
+        containers=(Container("C1", 10.0, "Panama", "Normal"),),
+        route=Route(("Panama",)),
+    )
+
+    message = helpers.milp_size_guard_message(instance)
+
+    assert helpers.milp_assignment_variable_upper_bound(instance) == 125_000
+    assert message is not None
+    assert "MILP was skipped" in message
+    assert "125,000" in message
+
+
 # -- Table shaping -----------------------------------------------------------
 
 
@@ -239,10 +261,13 @@ def test_metrics_table_rows_use_labels() -> None:
 
     rows = helpers.metrics_table_rows(result.metrics.as_dict())
 
-    labels = {row["metric"] for row in rows}
+    labels = [row["metric"] for row in rows]
     assert "Slot utilization" in labels
     assert "Total constraint violations" in labels
-    assert len(rows) == len(result.metrics.as_dict())
+    assert "Structurally feasible" in labels
+    assert "CG within tolerance" in labels
+    assert labels.count("Operationally feasible") == 1
+    assert len(rows) == len(result.metrics.as_dict()) - 1
 
 
 def test_comparison_row_exposes_shared_metrics() -> None:
@@ -252,8 +277,24 @@ def test_comparison_row_exposes_shared_metrics() -> None:
     row = helpers.comparison_row("Greedy", result)
 
     assert row["algorithm"] == "Greedy"
-    assert row["feasible"] is True
+    assert row["structural_feasible"] is True
+    assert row["cg_ok"] is True
+    assert row["operational_feasible"] is True
     assert "runtime_s" in row
     assert "real_rehandling" in row
     # Heuristic solvers expose no comparable objective value.
     assert row["objective"] is None
+
+
+def test_comparison_row_distinguishes_cg_tolerance_failure() -> None:
+    instance = create_small_example_instance()
+    result = helpers.build_solver(
+        "Greedy",
+        helpers.SolverParams(cg_tolerance_lon=0.0, cg_tolerance_lat=0.0),
+    ).solve(instance)
+
+    row = helpers.comparison_row("Greedy", result)
+
+    assert row["structural_feasible"] is True
+    assert row["cg_ok"] is False
+    assert row["operational_feasible"] is False
