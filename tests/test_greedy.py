@@ -99,11 +99,30 @@ def test_greedy_separates_incompatible_cargo() -> None:
 
     result = GreedySolver().solve(instance)
 
-    assert result.is_feasible
+    assert result.is_structurally_feasible
     assert result.metrics.incompatible_cargo_violations == 0
     flammable_bay = result.solution.slot_for("FLAM")[0]
     oxidizer_bay = result.solution.slot_for("OXID")[0]
     assert flammable_bay != oxidizer_bay
+
+
+def test_greedy_reports_structural_solution_outside_cg_tolerance() -> None:
+    instance = _instance(
+        Ship(bays=2, rows=1, tiers=1),
+        Route(("Panama",)),
+        (
+            Container("LIGHT", 10.0, "Panama", ContainerType.NORMAL),
+            Container("HEAVY", 30.0, "Panama", ContainerType.NORMAL),
+        ),
+    )
+
+    result = GreedySolver().solve(instance)
+
+    assert result.status == SolverStatus.INFEASIBLE
+    assert not result.is_feasible
+    assert result.is_structurally_feasible
+    assert not result.cg_within_tolerance
+    assert result.metrics.constraint_violations == 0
 
 
 def test_greedy_reports_infeasible_when_reefer_slot_missing() -> None:
@@ -121,7 +140,10 @@ def test_greedy_reports_infeasible_when_reefer_slot_missing() -> None:
 
     assert result.status == SolverStatus.INFEASIBLE
     assert not result.is_feasible
-    assert result.metrics.unassigned_container_count == 1
+    assert result.solution.assignments == ()
+    assert result.metrics.unassigned_container_count == 2
+    assert result.solver_status_detail is not None
+    assert "Validation failed" in result.solver_status_detail
 
 
 def test_greedy_repairs_incompatible_layout_with_swap() -> None:
@@ -160,3 +182,22 @@ def test_greedy_can_disable_repair() -> None:
 
     assert result.status == SolverStatus.INFEASIBLE
     assert result.metrics.incompatible_cargo_violations == 1
+
+
+def test_greedy_validates_instance_before_solving() -> None:
+    instance = _instance(
+        Ship(bays=1, rows=2, tiers=1),
+        Route(("Panama",)),
+        (
+            Container("C1", 10.0, "Panama", ContainerType.NORMAL),
+            Container("C1", 20.0, "Panama", ContainerType.NORMAL),
+        ),
+    )
+
+    result = GreedySolver().solve(instance)
+
+    assert result.status == SolverStatus.INFEASIBLE
+    assert not result.is_feasible
+    assert result.solution.assignments == ()
+    assert result.solver_status_detail is not None
+    assert "Validation failed" in result.solver_status_detail

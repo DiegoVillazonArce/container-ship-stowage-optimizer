@@ -31,7 +31,12 @@ from stowage_optimizer.core.metrics import (
 from stowage_optimizer.core.problem import ProblemInstance
 from stowage_optimizer.core.ship import Slot
 from stowage_optimizer.core.solution import SlotPosition, StowageSolution
-from stowage_optimizer.solvers.base import Solver, SolverResult, SolverStatus
+from stowage_optimizer.solvers.base import (
+    Solver,
+    SolverResult,
+    SolverStatus,
+    validate_solver_input,
+)
 from stowage_optimizer.solvers.greedy import GreedySolver
 
 Chromosome: TypeAlias = tuple[SlotPosition | None, ...]
@@ -125,6 +130,15 @@ class GeneticSolver(Solver):
     def solve(self, instance: ProblemInstance) -> SolverResult:
         start = time.perf_counter()
         self._rng = random.Random(self._config.random_seed)
+        invalid_result = validate_solver_input(
+            instance,
+            runtime_seconds=time.perf_counter() - start,
+            cg_tolerance_lon=self._config.cg_tolerance_lon,
+            cg_tolerance_lat=self._config.cg_tolerance_lat,
+            min_incompatible_bay_distance=self._config.min_incompatible_bay_distance,
+        )
+        if invalid_result is not None:
+            return invalid_result
 
         population = self._initial_population(instance)
         scored = self._score_population(instance, population)
@@ -201,6 +215,8 @@ class GeneticSolver(Solver):
         population: list[Chromosome] = []
 
         greedy_result = GreedySolver(
+            cg_tolerance_lon=self._config.cg_tolerance_lon,
+            cg_tolerance_lat=self._config.cg_tolerance_lat,
             min_incompatible_bay_distance=self._config.min_incompatible_bay_distance
         ).solve(instance)
         population.append(self._repair_chromosome(instance, self._encode(instance, greedy_result.solution)))

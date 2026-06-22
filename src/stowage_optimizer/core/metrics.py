@@ -96,16 +96,36 @@ class StowageMetrics:
         )
 
     @property
-    def is_feasible(self) -> bool:
-        """Return whether the solution is structurally feasible.
+    def is_structurally_feasible(self) -> bool:
+        """Return whether all non-CG hard structural rules are satisfied.
 
         True when no container is unassigned, no two containers share a slot,
         and no reefer, stack-continuity, or incompatible-cargo rule is broken.
-        Horizontal CG tolerance is reported separately and does not affect this
-        flag; check :attr:`within_lon_tolerance` and :attr:`within_lat_tolerance`
-        for balance.
+        Horizontal CG tolerance is intentionally exposed as a separate signal
+        because callers may need to distinguish a physically complete layout
+        from one that also satisfies the configured balance tolerances.
         """
         return self.constraint_violations == 0
+
+    @property
+    def cg_within_tolerance(self) -> bool:
+        """Return whether both horizontal CG checks pass."""
+        return self.within_lon_tolerance and self.within_lat_tolerance
+
+    @property
+    def operationally_feasible(self) -> bool:
+        """Return whether the solution is structurally valid and balanced."""
+        return self.is_structurally_feasible and self.cg_within_tolerance
+
+    @property
+    def is_feasible(self) -> bool:
+        """Return whether the solution satisfies structural and CG rules.
+
+        This is the overall operational feasibility flag. Use
+        :attr:`is_structurally_feasible` when a diagnostic needs to separate
+        structural validity from horizontal center-of-gravity tolerance.
+        """
+        return self.operationally_feasible
 
     def as_dict(self) -> dict[str, Any]:
         """Return a flat dictionary suitable for tables and comparison."""
@@ -131,6 +151,9 @@ class StowageMetrics:
             "constraint_violations": self.constraint_violations,
             "real_rehandling": self.real_rehandling,
             "real_rehandling_normalized": self.real_rehandling_normalized,
+            "is_structurally_feasible": self.is_structurally_feasible,
+            "cg_within_tolerance": self.cg_within_tolerance,
+            "operationally_feasible": self.operationally_feasible,
             "is_feasible": self.is_feasible,
         }
 

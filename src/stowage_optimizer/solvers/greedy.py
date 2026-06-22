@@ -15,6 +15,14 @@ Construction enforces slot capacity, stack continuity, and reefer
 compatibility as hard rules: a slot is only a candidate if it is empty,
 supported from below, and reefer-capable when required. After construction an
 optional swap-based repair tries to remove any remaining violations.
+
+Known limitation: repair only runs when the result is *structurally* infeasible
+(capacity, continuity, reefer, or incompatible-cargo violations). When the
+construction is structurally valid but horizontal CG falls outside tolerance,
+the greedy solver reports it as infeasible without attempting to rebalance. CG
+balancing is left to the MILP and Genetic solvers; adding a balance-oriented
+local search to the greedy baseline is tracked as a future enhancement
+(ROADMAP, "Add more advanced local search after Greedy or GA").
 """
 
 from __future__ import annotations
@@ -24,13 +32,20 @@ from dataclasses import dataclass
 
 from stowage_optimizer.core.container import Container, ContainerType
 from stowage_optimizer.core.metrics import (
+    DEFAULT_CG_TOLERANCE_LAT,
+    DEFAULT_CG_TOLERANCE_LON,
     DEFAULT_MIN_INCOMPATIBLE_BAY_DISTANCE,
     evaluate_solution,
 )
 from stowage_optimizer.core.problem import ProblemInstance
 from stowage_optimizer.core.ship import Slot
 from stowage_optimizer.core.solution import SlotPosition, StowageSolution
-from stowage_optimizer.solvers.base import Solver, SolverResult, SolverStatus
+from stowage_optimizer.solvers.base import (
+    Solver,
+    SolverResult,
+    SolverStatus,
+    validate_solver_input,
+)
 
 # Maximum number of full improvement passes attempted during swap repair.
 _MAX_REPAIR_PASSES = 20
@@ -56,34 +71,56 @@ class GreedySolver(Solver):
         self,
         *,
         weights: GreedyWeights = GreedyWeights(),
+        cg_tolerance_lon: float = DEFAULT_CG_TOLERANCE_LON,
+        cg_tolerance_lat: float = DEFAULT_CG_TOLERANCE_LAT,
         min_incompatible_bay_distance: int = DEFAULT_MIN_INCOMPATIBLE_BAY_DISTANCE,
         enable_repair: bool = True,
     ) -> None:
         self._weights = weights
+        self._cg_tolerance_lon = cg_tolerance_lon
+        self._cg_tolerance_lat = cg_tolerance_lat
         self._min_distance = min_incompatible_bay_distance
         self._enable_repair = enable_repair
 
     def solve(self, instance: ProblemInstance) -> SolverResult:
         start = time.perf_counter()
+        invalid_result = validate_solver_input(
+            instance,
+            runtime_seconds=time.perf_counter() - start,
+            cg_tolerance_lon=self._cg_tolerance_lon,
+            cg_tolerance_lat=self._cg_tolerance_lat,
+            min_incompatible_bay_distance=self._min_distance,
+        )
+        if invalid_result is not None:
+            return invalid_result
 
         assignment = self._construct(instance)
         solution = StowageSolution.from_mapping(assignment)
         metrics = evaluate_solution(
-            instance, solution, min_incompatible_bay_distance=self._min_distance
+            instance,
+            solution,
+            cg_tolerance_lon=self._cg_tolerance_lon,
+            cg_tolerance_lat=self._cg_tolerance_lat,
+            min_incompatible_bay_distance=self._min_distance,
         )
         status = SolverStatus.FEASIBLE if metrics.is_feasible else SolverStatus.INFEASIBLE
 
-        if not metrics.is_feasible and self._enable_repair:
+        if not metrics.is_structurally_feasible and self._enable_repair:
             repaired = self._repair(instance, assignment)
             repaired_solution = StowageSolution.from_mapping(repaired)
             repaired_metrics = evaluate_solution(
-                instance, repaired_solution, min_incompatible_bay_distance=self._min_distance
+                instance,
+                repaired_solution,
+                cg_tolerance_lon=self._cg_tolerance_lon,
+                cg_tolerance_lat=self._cg_tolerance_lat,
+                min_incompatible_bay_distance=self._min_distance,
             )
             if repaired_metrics.is_feasible:
                 solution, metrics = repaired_solution, repaired_metrics
                 status = SolverStatus.REPAIRED
             elif repaired_metrics.constraint_violations < metrics.constraint_violations:
                 solution, metrics = repaired_solution, repaired_metrics
+                status = SolverStatus.INFEASIBLE
 
         runtime = time.perf_counter() - start
         return SolverResult(
@@ -279,6 +316,10 @@ class GreedySolver(Solver):
     ) -> int:
         solution = StowageSolution.from_mapping(assignment)
         metrics = evaluate_solution(
-            instance, solution, min_incompatible_bay_distance=self._min_distance
+            instance,
+            solution,
+            cg_tolerance_lon=self._cg_tolerance_lon,
+            cg_tolerance_lat=self._cg_tolerance_lat,
+            min_incompatible_bay_distance=self._min_distance,
         )
         return metrics.constraint_violations

@@ -224,7 +224,8 @@ def test_duplicate_slot_assignment_is_counted() -> None:
 
 def test_cg_tolerance_does_not_affect_structural_feasibility() -> None:
     # 2x1x1 grid with all weight on one bay: CG_x breaches the default
-    # tolerance, but the assignment is structurally valid.
+    # tolerance, so the assignment is structurally valid but not operationally
+    # feasible.
     instance = _instance(
         Ship(bays=2, rows=1, tiers=1),
         Route(("Panama",)),
@@ -239,7 +240,10 @@ def test_cg_tolerance_does_not_affect_structural_feasibility() -> None:
 
     assert not metrics.within_lon_tolerance
     assert metrics.constraint_violations == 0
-    assert metrics.is_feasible
+    assert metrics.is_structurally_feasible
+    assert not metrics.cg_within_tolerance
+    assert not metrics.operationally_feasible
+    assert not metrics.is_feasible
 
 
 def test_unknown_container_in_solution_raises() -> None:
@@ -258,10 +262,10 @@ def test_example_instance_evaluates_as_feasible() -> None:
     instance = create_small_example_instance()
     solution = StowageSolution.from_mapping(
         {
-            "C001": (3, 1, 1),
-            "C002": (1, 1, 1),  # reefer container in a reefer-capable slot
-            "C003": (4, 1, 1),  # flammable
-            "C004": (6, 1, 1),  # oxidizer, two bays from the flammable
+            "C001": (3, 3, 1),
+            "C002": (2, 2, 1),  # reefer container in a reefer-capable slot
+            "C003": (5, 3, 1),  # flammable
+            "C004": (3, 2, 1),  # oxidizer, separated from the flammable
         }
     )
 
@@ -269,4 +273,6 @@ def test_example_instance_evaluates_as_feasible() -> None:
 
     assert metrics.total_weight == pytest.approx(87.0)
     assert metrics.is_feasible
+    assert metrics.is_structurally_feasible
+    assert metrics.cg_within_tolerance
     assert metrics.as_dict()["constraint_violations"] == 0

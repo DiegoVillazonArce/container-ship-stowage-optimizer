@@ -167,7 +167,29 @@ def test_genetic_reports_infeasible_when_capacity_is_insufficient() -> None:
 
     assert result.status == SolverStatus.INFEASIBLE
     assert not result.is_feasible
-    assert result.metrics.unassigned_container_count == 1
+    assert result.solution.assignments == ()
+    assert result.metrics.unassigned_container_count == 2
+    assert result.solver_status_detail is not None
+    assert "Validation failed" in result.solver_status_detail
+
+
+def test_genetic_validates_instance_before_solving() -> None:
+    instance = _instance(
+        Ship(bays=1, rows=2, tiers=1),
+        Route(("Panama",)),
+        (
+            Container("C1", 10.0, "Panama", ContainerType.NORMAL),
+            Container("C1", 20.0, "Panama", ContainerType.NORMAL),
+        ),
+    )
+
+    result = GeneticSolver(population_size=8, max_generations=5, random_seed=9).solve(instance)
+
+    assert result.status == SolverStatus.INFEASIBLE
+    assert not result.is_feasible
+    assert result.solution.assignments == ()
+    assert result.solver_status_detail is not None
+    assert "Validation failed" in result.solver_status_detail
 
 
 def test_genetic_separates_incompatible_cargo_when_possible() -> None:
