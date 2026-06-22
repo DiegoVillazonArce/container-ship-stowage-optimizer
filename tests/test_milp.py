@@ -1,3 +1,5 @@
+import pulp
+
 from stowage_optimizer.core import (
     Container,
     ContainerType,
@@ -19,7 +21,8 @@ def test_milp_solves_small_example_instance() -> None:
 
     result = MILPSolver().solve(instance)
 
-    assert result.status == SolverStatus.FEASIBLE
+    # A small instance solved without a time limit is certified optimal.
+    assert result.status == SolverStatus.OPTIMAL
     assert result.is_feasible
     assert result.metrics.is_feasible
     # Every container is placed exactly once on a distinct slot.
@@ -208,3 +211,75 @@ def test_milp_infeasible_when_cg_tolerance_cannot_be_met() -> None:
 
     assert result.status == SolverStatus.INFEASIBLE
     assert not result.is_feasible
+
+
+def test_milp_validates_instance_before_solving() -> None:
+    instance = _instance(
+        Ship(bays=1, rows=2, tiers=1),
+        Route(("Panama",)),
+        (
+            Container("C1", 10.0, "Panama", ContainerType.NORMAL),
+            Container("C1", 20.0, "Panama", ContainerType.NORMAL),
+        ),
+    )
+
+    result = MILPSolver().solve(instance)
+
+    assert result.status == SolverStatus.INFEASIBLE
+    assert not result.is_feasible
+    assert result.solution.assignments == ()
+    assert result.objective_value is None
+    assert result.solver_status_detail is not None
+    assert "Validation failed" in result.solver_status_detail
+
+
+def test_milp_rejects_non_finite_weight_before_backend() -> None:
+    instance = _instance(
+        Ship(bays=1, rows=1, tiers=1),
+        Route(("Panama",)),
+        (Container("C1", float("nan"), "Panama", ContainerType.NORMAL),),
+    )
+
+    result = MILPSolver().solve(instance)
+
+    assert result.status == SolverStatus.INFEASIBLE
+    assert not result.is_feasible
+    assert result.objective_value is None
+    assert result.solver_status_detail is not None
+    assert "Validation failed" in result.solver_status_detail
+    assert "finite weight" in result.solver_status_detail
+
+
+def test_classify_backend_status_certifies_only_proven_optimum() -> None:
+    # CBC reporting LpStatusOptimal *and* LpSolutionOptimal is a proven optimum.
+    is_optimal, detail = MILPSolver._classify_backend_status(
+        pulp.LpStatusOptimal, pulp.LpSolutionOptimal
+    )
+
+    assert is_optimal is True
+    assert detail == "Optimal"
+
+
+def test_classify_backend_status_rejects_uncertified_time_limit_incumbent() -> None:
+    # Under a time limit CBC keeps status "Optimal" but sol_status only reports a
+    # feasible incumbent. This must NOT be treated as a certified optimum.
+    is_optimal, detail = MILPSolver._classify_backend_status(
+        pulp.LpStatusOptimal, pulp.LpSolutionIntegerFeasible
+    )
+
+    assert is_optimal is False
+    assert "not certified" in detail
+    # The matching final status is NOT_SOLVED, never OPTIMAL/FEASIBLE.
+    assert (
+        MILPSolver._solver_status(is_optimal, pulp.LpStatusOptimal, True)
+        == SolverStatus.NOT_SOLVED
+    )
+
+
+def test_classify_backend_status_passes_through_infeasible_and_not_solved() -> None:
+    assert MILPSolver._classify_backend_status(
+        pulp.LpStatusInfeasible, pulp.LpSolutionInfeasible
+    ) == (False, "Infeasible")
+    assert MILPSolver._classify_backend_status(
+        pulp.LpStatusNotSolved, pulp.LpSolutionNoSolutionFound
+    ) == (False, "Not Solved")
