@@ -288,6 +288,8 @@ The model uses moment-based CG control instead of only comparing total weight by
 
 The model may include a simplified structural stack weight constraint. For each stack `(b, r)` and tier `t`, the total weight above a container should not exceed a maximum supported weight `M`:
 
+This optional constraint is not implemented in the current Phases 1-6 codebase; it is documented as a future extension.
+
 ```text
 sum over t' > t, c of weight[c] * x[c, (b, r, t')]
 <=

@@ -385,7 +385,9 @@ The MVP is complete when:
 - Add benchmark result export.
 - Add sensitivity analysis for objective weights.
 - Add decomposition or rolling-horizon methods for larger instances.
+- Recover feasible non-optimal MILP incumbent solutions when time limits stop CBC before optimality is certified.
 - Add more advanced local search after Greedy or GA.
+- Migrate the MILP implementation to the PuLP 4 API and replace deprecated CBC command usage.
 - Add richer Streamlit visual diagnostics.
 - Add optional persistence with SQLite.
 - Add documentation comparing academic assumptions with real maritime planning constraints.
