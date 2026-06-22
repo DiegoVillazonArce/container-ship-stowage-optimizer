@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import csv
 import io
+import math
 import re
 from dataclasses import dataclass
 
@@ -221,6 +222,11 @@ def parse_containers_csv(text: str) -> ContainerParseResult:
                 weight = float(weight_raw)
             except ValueError:
                 row_errors.append(f"Row {row_number}: weight `{weight_raw}` is not a number.")
+            else:
+                if not math.isfinite(weight):
+                    row_errors.append(
+                        f"Row {row_number}: weight `{weight_raw}` must be finite."
+                    )
 
         if row_errors:
             errors.extend(row_errors)

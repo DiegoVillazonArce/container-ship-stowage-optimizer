@@ -37,6 +37,16 @@ def test_ship_rejects_invalid_dimensions() -> None:
         Ship(bays=0, rows=2, tiers=2)
 
 
+def test_ship_rejects_boolean_dimensions() -> None:
+    with pytest.raises(ValueError, match="bays"):
+        Ship(bays=True, rows=2, tiers=2)
+
+
 def test_ship_rejects_reefer_slots_outside_grid() -> None:
     with pytest.raises(ValueError, match="outside the ship grid"):
         Ship(bays=2, rows=2, tiers=2, reefer_slots=((3, 1, 1),))
+
+
+def test_ship_rejects_boolean_reefer_slot_coordinates() -> None:
+    with pytest.raises(ValueError, match="values must be integers"):
+        Ship(bays=2, rows=2, tiers=2, reefer_slots=((True, 1, 1),))

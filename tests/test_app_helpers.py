@@ -91,6 +91,23 @@ def test_parse_csv_reports_non_numeric_weight_with_row_number() -> None:
     assert any("Row 2" in error and "not a number" in error for error in result.errors)
 
 
+def test_parse_csv_reports_non_finite_weights_with_row_number() -> None:
+    text = (
+        "id,weight,destination_port,type\n"
+        "C1,nan,Panama,Normal\n"
+        "C2,inf,Panama,Normal\n"
+        "C3,-inf,Panama,Normal\n"
+    )
+
+    result = helpers.parse_containers_csv(text)
+
+    assert not result.ok
+    assert result.containers == ()
+    assert len(result.errors) == 3
+    assert all("must be finite" in error for error in result.errors)
+    assert any("Row 2" in error for error in result.errors)
+
+
 def test_parse_csv_reports_missing_required_cells() -> None:
     text = "id,weight,destination_port,type\n,10,Panama,Normal\nC2,,Brazil,Normal\n"
 

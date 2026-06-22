@@ -40,6 +40,24 @@ def test_validation_rejects_invalid_weights() -> None:
     assert "invalid_container_weight" in _codes(result)
 
 
+def test_validation_rejects_non_finite_weights() -> None:
+    instance = ProblemInstance(
+        ship=Ship(bays=1, rows=3, tiers=1),
+        route=Route(("Panama",)),
+        containers=(
+            Container("NAN", float("nan"), "Panama", ContainerType.NORMAL),
+            Container("INF", float("inf"), "Panama", ContainerType.NORMAL),
+            Container("NINF", float("-inf"), "Panama", ContainerType.NORMAL),
+        ),
+    )
+
+    result = validate_instance(instance)
+
+    assert not result.is_valid
+    assert [issue.code for issue in result.errors].count("invalid_container_weight") == 3
+    assert all("finite" in issue.message for issue in result.errors)
+
+
 def test_validation_rejects_unknown_container_type() -> None:
     instance = ProblemInstance(
         ship=Ship(bays=1, rows=1, tiers=1),

@@ -82,7 +82,7 @@ class Ship:
 
     def _validate_dimensions(self) -> None:
         for name, value in (("bays", self.bays), ("rows", self.rows), ("tiers", self.tiers)):
-            if not isinstance(value, int) or value <= 0:
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
                 raise ValueError(f"`{name}` must be a positive integer.")
 
     def _validate_reefer_slots(self, reefer_slots: frozenset[tuple[int, int, int]]) -> None:
@@ -94,6 +94,9 @@ class Ship:
             raise ValueError("Slot position must be a `(bay, row, tier)` tuple.")
 
         bay, row, tier = position
+        if any(isinstance(value, bool) or not isinstance(value, int) for value in position):
+            raise ValueError("Slot position values must be integers.")
+
         if not (1 <= bay <= self.bays and 1 <= row <= self.rows and 1 <= tier <= self.tiers):
             raise ValueError(
                 f"Slot position {position} is outside the ship grid "

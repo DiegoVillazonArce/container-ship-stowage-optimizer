@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass, field
+import math
 from numbers import Real
 
 from stowage_optimizer.core.container import ContainerType
@@ -79,6 +80,15 @@ def _validate_container_weights(instance: ProblemInstance, errors: list[Validati
                 ValidationIssue(
                     code="invalid_container_weight",
                     message=f"Container {container.id} has a non-numeric weight.",
+                )
+            )
+            continue
+
+        if not math.isfinite(container.weight):
+            errors.append(
+                ValidationIssue(
+                    code="invalid_container_weight",
+                    message=f"Container {container.id} must have a finite weight.",
                 )
             )
             continue
