@@ -8,6 +8,7 @@ from stowage_optimizer.core import (
     Ship,
     StowageSolution,
     evaluate_solution,
+    simulate_unloading_events,
 )
 from stowage_optimizer.core.examples import create_small_example_instance
 
@@ -182,6 +183,31 @@ def test_real_rehandling_counts_blocking_move() -> None:
     assert metrics.real_rehandling == 1
     # Max rehandling for one 2-tier stack is 1, so normalization is 1.0.
     assert metrics.real_rehandling_normalized == pytest.approx(1.0)
+
+
+def test_simulate_unloading_events_reports_steps_and_remaining_assignment() -> None:
+    instance = _instance(
+        Ship(bays=1, rows=1, tiers=2),
+        Route(("Panama", "Brazil")),
+        (
+            Container("C001", 10.0, "Panama", ContainerType.NORMAL),
+            Container("C002", 10.0, "Brazil", ContainerType.NORMAL),
+        ),
+    )
+    solution = StowageSolution.from_mapping({"C001": (1, 1, 1), "C002": (1, 1, 2)})
+
+    steps = simulate_unloading_events(instance, solution)
+
+    assert len(steps) == 2
+    assert steps[0].port == "Panama"
+    assert steps[0].removed_container_ids == ("C001",)
+    assert steps[0].rehandled_container_ids == ("C002",)
+    assert steps[0].rehandle_count == 1
+    assert steps[0].remaining_assignment.assignment_map == {"C002": (1, 1, 1)}
+    assert steps[1].port == "Brazil"
+    assert steps[1].removed_container_ids == ("C002",)
+    assert steps[1].rehandled_container_ids == ()
+    assert steps[1].remaining_assignment.assignment_map == {}
 
 
 def test_unassigned_container_makes_solution_infeasible() -> None:

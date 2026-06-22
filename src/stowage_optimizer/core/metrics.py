@@ -51,6 +51,27 @@ class _Placement(NamedTuple):
 
 
 @dataclass(frozen=True, slots=True)
+class UnloadingStep:
+    """One simulated unloading step for a route port.
+
+    ``remaining_assignment`` contains only the containers still onboard after
+    unloading ``port``. Each remaining stack is compacted bottom-up while
+    preserving its relative order, matching the simplified unloading model used
+    for the real rehandling metric.
+    """
+
+    port: str
+    removed_container_ids: tuple[str, ...]
+    rehandled_container_ids: tuple[str, ...]
+    remaining_assignment: StowageSolution
+
+    @property
+    def rehandle_count(self) -> int:
+        """Return the number of blocking moves for this port."""
+        return len(self.rehandled_container_ids)
+
+
+@dataclass(frozen=True, slots=True)
 class StowageMetrics:
     """Deterministic evaluation of a complete stowage solution."""
 
@@ -223,6 +244,22 @@ def evaluate_solution(
     )
 
 
+def simulate_unloading_events(
+    instance: ProblemInstance,
+    solution: StowageSolution,
+) -> tuple[UnloadingStep, ...]:
+    """Return port-by-port unloading events for a complete stowage plan.
+
+    This exposes the same simplified simulation used by
+    :func:`evaluate_solution` to count real rehandling. It is intended as the
+    data contract for Phase 7 visualization: UI code can inspect removed
+    containers, temporary rehandles, and the remaining compacted assignment
+    after each route port.
+    """
+    placements = _resolve_placements(instance, solution)
+    return _simulate_unloading_steps(instance, placements)
+
+
 def _resolve_placements(
     instance: ProblemInstance, solution: StowageSolution
 ) -> tuple[_Placement, ...]:
@@ -302,32 +339,73 @@ def _real_rehandling(
     moved aside; each such move is one rehandle. Containers placed back may
     block again at later ports, which is counted again.
     """
-    stacks: dict[tuple[int, int], list[Container]] = {}
-    for p in sorted(placements, key=lambda placement: placement.slot.tier):
-        stacks.setdefault((p.slot.bay, p.slot.row), []).append(p.container)
+    return sum(
+        step.rehandle_count
+        for step in _simulate_unloading_steps(instance, placements)
+    )
 
-    rehandling = 0
+
+def _simulate_unloading_steps(
+    instance: ProblemInstance, placements: tuple[_Placement, ...]
+) -> tuple[UnloadingStep, ...]:
+    stacks: dict[tuple[int, int], list[_Placement]] = {}
+    for placement in sorted(
+        placements, key=lambda item: (item.slot.bay, item.slot.row, item.slot.tier)
+    ):
+        stacks.setdefault((placement.slot.bay, placement.slot.row), []).append(placement)
+
+    steps: list[UnloadingStep] = []
     for port in instance.route.ports:
-        for position, stack in list(stacks.items()):
+        removed_ids: list[str] = []
+        rehandled_ids: list[str] = []
+
+        for position in sorted(stacks):
+            stack = stacks[position]
             target_indices = [
                 index
-                for index, container in enumerate(stack)
-                if container.destination_port == port
+                for index, placement in enumerate(stack)
+                if placement.container.destination_port == port
             ]
             if not target_indices:
                 continue
 
             deepest_target = min(target_indices)
-            rehandling += sum(
-                1
-                for container in stack[deepest_target + 1:]
-                if container.destination_port != port
+            rehandled_ids.extend(
+                placement.container.id
+                for placement in stack[deepest_target + 1:]
+                if placement.container.destination_port != port
+            )
+            removed_ids.extend(
+                placement.container.id
+                for placement in stack
+                if placement.container.destination_port == port
             )
             stacks[position] = [
-                container for container in stack if container.destination_port != port
+                placement
+                for placement in stack
+                if placement.container.destination_port != port
             ]
 
-    return rehandling
+        steps.append(
+            UnloadingStep(
+                port=port,
+                removed_container_ids=tuple(removed_ids),
+                rehandled_container_ids=tuple(rehandled_ids),
+                remaining_assignment=_remaining_assignment_from_stacks(stacks),
+            )
+        )
+
+    return tuple(steps)
+
+
+def _remaining_assignment_from_stacks(
+    stacks: dict[tuple[int, int], list[_Placement]]
+) -> StowageSolution:
+    assignments: dict[str, SlotPosition] = {}
+    for (bay, row), stack in sorted(stacks.items()):
+        for tier, placement in enumerate(stack, start=1):
+            assignments[placement.container.id] = (bay, row, tier)
+    return StowageSolution.from_mapping(assignments)
 
 
 def _normalize_real_rehandling(instance: ProblemInstance, real_rehandling: int) -> float:
