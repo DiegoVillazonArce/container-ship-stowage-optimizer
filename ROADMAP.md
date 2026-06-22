@@ -301,7 +301,9 @@ Add Plotly-based 3D visualization and port-by-port unloading analysis.
 
 ### Goal
 
-Finalize the academic project by strengthening tests, creating benchmark scenarios, and documenting design decisions.
+Finalize the academic project by strengthening tests, creating benchmark scenarios,
+documenting design decisions, and identifying evidence-based optimization
+opportunities without changing the solver formulations in this phase.
 
 ### User Stories
 
@@ -309,6 +311,7 @@ Finalize the academic project by strengthening tests, creating benchmark scenari
 - As a developer, I want benchmark instances, so that algorithm behavior can be compared empirically.
 - As a developer, I want documented limitations, so that the project scope is clear and academically honest.
 - As a developer, I want reproducible result tables, so that the final analysis can be defended.
+- As a developer, I want a benchmark-driven scalability review, so that future optimization work targets real bottlenecks instead of guesses.
 
 ### Tasks
 
@@ -320,6 +323,9 @@ Finalize the academic project by strengthening tests, creating benchmark scenari
 - [ ] Create benchmark datasets.
 - [ ] Benchmark Greedy, MILP, and GA on shared instances.
 - [ ] Record runtime, feasibility, CG metrics, `CG_z`, rehandling, utilization, and violations.
+- [ ] Analyze benchmark results to identify solver and model bottlenecks.
+- [ ] Document safe optimization opportunities, such as valid candidate-slot pruning or repeated-computation caching.
+- [ ] Document higher-risk heuristic optimization opportunities separately from safe model-preserving changes.
 - [ ] Document solver assumptions.
 - [ ] Document known limitations.
 - [ ] Update README links to design and roadmap documents.
@@ -331,7 +337,7 @@ Finalize the academic project by strengthening tests, creating benchmark scenari
 - Core behavior is covered by automated tests.
 - Benchmark scenarios can be rerun.
 - Algorithm comparison uses common final metrics.
-- Documentation explains the mathematical model, implementation plan, assumptions, and limitations.
+- Documentation explains the mathematical model, implementation plan, assumptions, limitations, and future optimization opportunities.
 
 ## Suggested GitHub Issues
 
@@ -358,6 +364,7 @@ Finalize the academic project by strengthening tests, creating benchmark scenari
 - Add unloading simulation view.
 - Create small benchmark instances.
 - Add solver comparison report.
+- Write scalability and optimization-opportunity notes.
 - Write final academic limitations section.
 
 ## Definition of Done for MVP
@@ -391,3 +398,14 @@ The MVP is complete when:
 - Add richer Streamlit visual diagnostics.
 - Add optional persistence with SQLite.
 - Add documentation comparing academic assumptions with real maritime planning constraints.
+
+### Scalability and Solver Optimization
+
+- Add safe candidate-slot pruning for assignments that are impossible by hard constraints.
+- Add MILP symmetry-breaking constraints where they preserve the feasible region.
+- Add stronger MILP bounds or preprocessing to reduce model size.
+- Add warm-start support for MILP from Greedy or GA solutions.
+- Cache repeated metric and fitness computations in the Genetic Algorithm.
+- Optimize real rehandling simulation for larger instances.
+- Explore hybrid approaches, such as Greedy construction followed by local search.
+- Separate safe model-preserving optimizations from heuristic search-space reductions.
