@@ -787,10 +787,47 @@ The test suite should cover the system at several levels.
 - Validate the returned solution.
 - Compute common metrics.
 
-## 19. Design Limitations
+## 19. Benchmark Scenarios and Reproducibility
+
+Phase 8 adds shared benchmark scenarios in `stowage_optimizer.benchmarks`.
+They are regular `ProblemInstance` objects plus scenario-specific CG
+tolerances and incompatible-cargo separation settings. This keeps tests,
+manual benchmarks, and documentation aligned around the same inputs.
+
+Canonical scenarios:
+
+| Scenario | Purpose |
+| --- | --- |
+| `small_base` | Hand-checkable base instance with all supported cargo classes. |
+| `reefer_focus` | Limited reefer-capable slots and multiple reefers. |
+| `incompatible_cargo` | Strict Flammable/Oxidizer bay separation. |
+| `multi_port_rehandling` | Three-port route with a reference layout that has real rehandling. |
+| `medium_scalability` | Moderate mixed instance for manual runtime comparison. |
+
+The benchmark runner records:
+
+- runtime;
+- solver status;
+- feasibility and structural violations;
+- utilization;
+- `CG_x`, `CG_y`, and normalized `CG_z`;
+- real rehandling;
+- objective value and gap when available.
+
+Interpretation rules:
+
+- Compare solvers through common final metrics.
+- Do not treat internal objective values as equivalent across algorithms.
+- Treat CBC runtime and MILP status as machine- and backend-dependent.
+- Keep heavyweight timing comparisons outside brittle automated assertions.
+- Use fixed GA seeds when reproducible assignments are required.
+
+## 20. Design Limitations
 
 This design intentionally excludes several real-world complexities:
 
+- It represents the ship as a rectangular slot grid.
+- It assumes every container occupies exactly one slot.
 - It does not model full naval architecture stability.
 - It does not calculate metacentric height.
 - It does not model hydrostatics.
@@ -798,12 +835,15 @@ This design intentionally excludes several real-world complexities:
 - It does not model crane scheduling.
 - It does not model certified dangerous goods segregation.
 - It does not model container dimensions beyond a simplified one-slot assumption.
+- It uses simplified Flammable/Oxidizer bay separation.
+- It uses a simplified stack-based rehandling simulation.
 - It does not model hatch covers, lashing forces, or industrial-grade vessel-specific rules.
+- It does not implement structural stack-weight constraints.
 - It does not guarantee industrial-grade operational validity.
 
 These limitations are acceptable for the academic goal: build a rigorous, explainable, and testable optimization model that captures key ideas of container stowage without exceeding the project scope.
 
-## 20. Future Design Extensions
+## 21. Future Design Extensions
 
 Possible extensions include:
 
@@ -821,3 +861,25 @@ Possible extensions include:
 - More detailed unloading simulation.
 - Optional persistence using SQLite.
 - More advanced dashboard reporting for benchmark experiments.
+
+### Safe Model-Preserving Optimizations
+
+These optimizations should preserve the feasible region and therefore can be
+validated against the current tests and benchmark scenarios:
+
+- Candidate-slot pruning for assignments that are impossible by hard constraints.
+- MILP preprocessing for reefers, invalid slots, and fixed impossible pairs.
+- Symmetry-breaking constraints that do not eliminate unique feasible layouts.
+- Warm starts from Greedy or GA plans when supported by the backend.
+- Caching repeated metric and fitness computations in the Genetic Algorithm.
+- Optimizing real rehandling simulation with stack indexes and incremental updates.
+
+### Higher-Risk Heuristic Reductions
+
+These may improve runtime but can change which solutions are explored, so they
+should be documented and benchmarked separately:
+
+- Destination- or cargo-priority candidate pruning.
+- Limiting GA candidate bays for medium and large instances.
+- Greedy construction followed by local search.
+- Rolling-horizon, decomposition, or hybrid MILP/heuristic workflows.

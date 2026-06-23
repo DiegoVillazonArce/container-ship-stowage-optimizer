@@ -1,12 +1,12 @@
 # Container Ship Stowage Optimizer
 
-**Status:** Phases 1 through 7 completed. Core domain models, validation, a small example instance, the common metrics engine, the greedy baseline solver, the exact MILP reference solver, the genetic algorithm solver, the Streamlit interface, Plotly 3D visualization, and port-by-port unloading simulation are implemented. The core package, Streamlit-independent app helpers, and visualization helpers are unit-tested. Phase 8 testing, benchmarking, and documentation hardening is next.
+**Status:** Phases 1 through 8 completed. Core domain models, validation, a small example instance, the common metrics engine, the greedy baseline solver, the exact MILP reference solver, the genetic algorithm solver, the Streamlit interface, Plotly 3D visualization, port-by-port unloading simulation, reproducible benchmark scenarios, benchmark runner helpers, and final academic documentation are implemented. The core package, solvers, benchmark helpers, Streamlit-independent app helpers, and visualization helpers are unit-tested.
 
 ## Current Repository State
 
-This repository contains the project planning documentation plus the first seven implementation increments. The current Python package includes vessel slots and normalized coordinates, container and route models, problem instances, pre-solver validation, a small hand-checkable example, a common metrics engine (weight, utilization, center-of-gravity moments, side and end balance, constraint-violation counts, and real rehandling by simulated unloading), a common solver interface, the greedy baseline solver with optional swap-based repair, the MILP exact reference solver (PuLP/CBC) enforcing the hard constraints and minimizing the linear objective, the genetic algorithm metaheuristic solver, the Streamlit interface with Plotly 3D visualization and unloading simulation, and automated tests.
+This repository contains the project planning documentation plus the completed implementation increments. The current Python package includes vessel slots and normalized coordinates, container and route models, problem instances, pre-solver validation, a small hand-checkable example, a common metrics engine (weight, utilization, center-of-gravity moments, side and end balance, constraint-violation counts, and real rehandling by simulated unloading), a common solver interface, the greedy baseline solver with optional swap-based repair, the MILP exact reference solver (PuLP/CBC) enforcing the hard constraints and minimizing the linear objective, the genetic algorithm metaheuristic solver, the Streamlit interface with Plotly 3D visualization and unloading simulation, reproducible benchmark scenarios, benchmark table exporters, and automated tests.
 
-The detailed implementation plan is maintained in [ROADMAP.md](./ROADMAP.md). The roadmap is the source of truth for phase boundaries.
+The detailed implementation plan is maintained in [ROADMAP.md](./ROADMAP.md). The roadmap is the source of truth for phase boundaries. Technical model details are documented in [docs/DESIGN.md](./docs/DESIGN.md), and benchmark reproduction notes are documented in [docs/BENCHMARKS.md](./docs/BENCHMARKS.md).
 
 ## 1. Executive Summary
 
@@ -417,9 +417,9 @@ Current roadmap status:
 | Phase 5 | Genetic Algorithm | Completed |
 | Phase 6 | Streamlit Interface | Completed |
 | Phase 7 | 3D Visualization and Unloading Simulation | Completed |
-| Phase 8 | Testing, Benchmarking, and Documentation | Next |
+| Phase 8 | Testing, Benchmarking, and Documentation | Completed |
 
-Implementation tasks such as CSV upload, solver construction, dashboard output, and visualization are intentionally scheduled after the domain model foundation.
+The implemented benchmark layer compares algorithms through shared final metrics. Raw internal objective values are reported when available, but they should not be interpreted as equivalent across Greedy, MILP, and Genetic Algorithm runs.
 
 ---
 
@@ -594,10 +594,35 @@ Editable mode means source changes under `src/` are immediately reflected withou
 ### 5. Run tests
 
 ```bash
-pytest
+python -m pytest
 ```
 
-### 6. Deactivate the virtual environment
+### 6. Run reproducible benchmarks
+
+Quick smoke benchmark:
+
+```bash
+python -m stowage_optimizer.benchmarks.runner --quick
+```
+
+Write a CSV table for one scenario:
+
+```bash
+python -m stowage_optimizer.benchmarks.runner --scenario small_base --format csv --output benchmark_results.csv
+```
+
+After installing the project, the console script is also available:
+
+```bash
+stowage-benchmark --quick
+```
+
+Benchmark runtimes depend on the machine, Python version, operating system,
+and CBC behavior. Use fixed GA seeds for reproducible assignments.
+If you run from a source checkout before installing editable mode, set
+`PYTHONPATH=src` for `python -m stowage_optimizer.benchmarks.runner`.
+
+### 7. Deactivate the virtual environment
 
 ```bash
 deactivate
@@ -627,7 +652,76 @@ The CSV `type` column accepts `Normal`, `Reefer`, `Flammable`, or `Oxidizer`.
 
 ---
 
-## 19. Academic Value
+## 19. Benchmarking and Reproducibility
+
+Phase 8 adds shared benchmark scenarios in `stowage_optimizer.benchmarks`.
+They are deterministic and can be reused by tests, scripts, notebooks, or the
+CLI runner.
+
+| Scenario | Purpose |
+| --- | --- |
+| `small_base` | Hand-checkable base case with normal, reefer, flammable, and oxidizer cargo. |
+| `reefer_focus` | Limited reefer-capable slots with multiple reefer containers. |
+| `incompatible_cargo` | Strict Flammable/Oxidizer bay separation. |
+| `multi_port_rehandling` | Three-port route where real rehandling is meaningful. |
+| `medium_scalability` | Moderate mixed case for manual runtime comparison. |
+
+Benchmark tables report common final metrics:
+
+- solver status and runtime;
+- feasibility, utilization, and structural violations;
+- `CG_x`, `CG_y`, and normalized `CG_z`;
+- real rehandling count;
+- objective value and gap only when the solver exposes them.
+
+Raw objective values are not comparable across algorithms because Greedy, MILP,
+and GA use different construction logic, proxies, and penalty structures. Use
+the shared final metrics for interpretation.
+
+Detailed benchmark instructions are in [docs/BENCHMARKS.md](./docs/BENCHMARKS.md).
+
+---
+
+## 20. Assumptions and Limitations
+
+The project intentionally remains an academic model:
+
+- the vessel is a simplified rectangular grid;
+- each container occupies one slot;
+- center of gravity is normalized and does not represent complete naval stability;
+- Flammable/Oxidizer separation is a simplified bay-distance rule;
+- rehandling is simulated with a simplified stack model;
+- crane scheduling is not modeled;
+- structural stack-weight limits are not implemented;
+- the software is not certified industrial stowage planning software.
+
+These limitations keep the model explainable, testable, and suitable for
+comparing exact and heuristic approaches within a bounded academic scope.
+
+---
+
+## 21. Future Optimization Opportunities
+
+Safe optimizations that preserve the current model:
+
+- candidate-slot pruning for assignments made impossible by hard constraints;
+- MILP preprocessing for reefers, invalid slot pairs, and fixed impossible cases;
+- symmetry-breaking constraints that do not remove feasible unique solutions;
+- warm starts from Greedy or GA plans when supported by the solver backend;
+- caching repeated GA fitness and metrics computations;
+- faster stack indexing for real rehandling simulation.
+
+Higher-risk heuristic reductions should be documented separately because they
+can change the explored search space:
+
+- pruning candidate bays by destination or cargo priority;
+- limiting GA candidates for medium and large scenarios;
+- hybrid Greedy plus local search;
+- decomposition or rolling-horizon methods for larger MILP experiments.
+
+---
+
+## 22. Academic Value
 
 This project combines:
 
@@ -644,7 +738,7 @@ Its main value is translating a real industrial logistics problem into an implem
 
 ---
 
-## 20. CV Description
+## 23. CV Description
 
 **Container Ship Stowage Optimization System**
 
@@ -652,6 +746,6 @@ Developed a Python-based optimization system for container ship stowage using MI
 
 ---
 
-## 21. License
+## 24. License
 
 This project is licensed under the MIT License. See [LICENSE](./LICENSE) for details.

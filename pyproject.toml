@@ -15,6 +15,9 @@ dependencies = [
     "plotly>=5.20",
 ]
 
+[project.scripts]
+stowage-benchmark = "stowage_optimizer.benchmarks.runner:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=7.4",

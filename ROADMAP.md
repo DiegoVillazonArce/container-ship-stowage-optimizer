@@ -305,6 +305,10 @@ Finalize the academic project by strengthening tests, creating benchmark scenari
 documenting design decisions, and identifying evidence-based optimization
 opportunities without changing the solver formulations in this phase.
 
+**Status:** Completed. Shared benchmark scenarios and a benchmark runner now live
+under `stowage_optimizer.benchmarks`; final documentation is linked from the
+README, DESIGN document, and benchmark guide.
+
 ### User Stories
 
 - As a developer, I want known small test cases, so that solver correctness can be checked manually.
@@ -315,22 +319,25 @@ opportunities without changing the solver formulations in this phase.
 
 ### Tasks
 
-- [ ] Add unit tests for domain models.
-- [ ] Add unit tests for validation.
-- [ ] Add unit tests for metrics.
-- [ ] Add unit tests for solver interfaces.
-- [ ] Add integration tests for small scenarios.
-- [ ] Create benchmark datasets.
-- [ ] Benchmark Greedy, MILP, and GA on shared instances.
-- [ ] Record runtime, feasibility, CG metrics, `CG_z`, rehandling, utilization, and violations.
-- [ ] Analyze benchmark results to identify solver and model bottlenecks.
-- [ ] Document safe optimization opportunities, such as valid candidate-slot pruning or repeated-computation caching.
-- [ ] Document higher-risk heuristic optimization opportunities separately from safe model-preserving changes.
-- [ ] Document solver assumptions.
-- [ ] Document known limitations.
-- [ ] Update README links to design and roadmap documents.
-- [ ] Add example screenshots after the interface exists.
-- [ ] Add reproducibility notes.
+- [x] Add unit tests for domain models.
+- [x] Add unit tests for validation.
+- [x] Add unit tests for metrics.
+- [x] Add unit tests for solver interfaces.
+- [x] Add integration tests for small scenarios.
+- [x] Create benchmark datasets.
+- [x] Benchmark Greedy, MILP, and GA on shared instances.
+- [x] Record runtime, feasibility, CG metrics, `CG_z`, rehandling, utilization, and violations.
+- [x] Analyze benchmark results to identify solver and model bottlenecks.
+- [x] Document safe optimization opportunities, such as valid candidate-slot pruning or repeated-computation caching.
+- [x] Document higher-risk heuristic optimization opportunities separately from safe model-preserving changes.
+- [x] Document solver assumptions.
+- [x] Document known limitations.
+- [x] Update README links to design, roadmap, and benchmark documents.
+- [x] Add reproducibility notes.
+
+Optional README screenshots remain a future presentation enhancement rather than
+a Phase 8 correctness requirement; Streamlit is covered through its pure helper
+tests instead of visual UI assertions.
 
 ### Definition of Done
 
