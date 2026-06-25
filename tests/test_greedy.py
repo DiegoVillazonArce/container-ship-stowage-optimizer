@@ -1,5 +1,3 @@
-import pytest
-
 from stowage_optimizer.core import (
     Container,
     ContainerType,

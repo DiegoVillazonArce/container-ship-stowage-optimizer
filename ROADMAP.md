@@ -362,15 +362,16 @@ Add project quality tooling, repeatable local entry points, and deployment readi
 
 ### Tasks
 
-- [ ] Add Ruff linting configuration.
-- [ ] Add a GitHub Actions workflow that runs `pytest`.
-- [ ] Add a GitHub Actions workflow step that runs `ruff`.
-- [ ] Add test coverage reporting.
-- [ ] Add `run_app.ps1` for launching the Streamlit app.
-- [ ] Add `run_tests.ps1` for running the test suite.
-- [ ] Verify Streamlit Community Cloud deployment prerequisites, including app entry point, declared dependencies, and repository file layout.
-- [ ] Add deployment notes for publishing the Streamlit app.
-- [ ] Document operational limits for hosted runs, especially MILP size and time-limit behavior.
+- [x] Add Ruff linting configuration.
+- [x] Add a GitHub Actions workflow that runs `pytest`.
+- [x] Add a GitHub Actions workflow step that runs `ruff`.
+- [x] Add test coverage reporting.
+- [x] Add `run_app.ps1` for launching the Streamlit app.
+- [x] Add `run_tests.ps1` for running the test suite.
+- [x] Verify Streamlit Community Cloud deployment prerequisites, including app entry point, declared dependencies, and repository file layout.
+- [x] Add deployment notes for publishing the Streamlit app.
+- [x] Document operational limits for hosted runs, especially MILP size and time-limit behavior.
+- [ ] Publish the Streamlit app and add the public app URL to the README.
 
 ### Definition of Done
 
@@ -379,6 +380,7 @@ Add project quality tooling, repeatable local entry points, and deployment readi
 - Test coverage can be generated and reviewed.
 - PowerShell scripts provide repeatable app and test entry points.
 - The repository is ready for Streamlit Community Cloud deployment and documents the deployment process.
+- The public Streamlit app URL is documented after deployment.
 
 ## Phase 10 — MILP Incumbent Recovery
 

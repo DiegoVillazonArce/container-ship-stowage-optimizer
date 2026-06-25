@@ -1,6 +1,6 @@
 # Container Ship Stowage Optimizer
 
-**Status:** Phases 1 through 8 completed. Phases 9 through 14 are planned roadmap extensions covering quality tooling, deployment readiness, incumbent recovery, scenario/result export, visual diagnostics, local search, and an academic explanation layer. Core domain models, validation, a small example instance, the common metrics engine, the greedy baseline solver, the exact MILP reference solver, the genetic algorithm solver, the Streamlit interface, Plotly 3D visualization, port-by-port unloading simulation, reproducible benchmark scenarios, benchmark runner helpers, and final academic documentation are implemented. The core package, solvers, benchmark helpers, Streamlit-independent app helpers, and visualization helpers are unit-tested.
+**Status:** Phases 1 through 8 completed. Phase 9 is in progress with quality tooling, reproducibility, and deployment readiness underway; Phases 10 through 14 are planned roadmap extensions covering incumbent recovery, scenario/result export, visual diagnostics, local search, and an academic explanation layer. Core domain models, validation, a small example instance, the common metrics engine, the greedy baseline solver, the exact MILP reference solver, the genetic algorithm solver, the Streamlit interface, Plotly 3D visualization, port-by-port unloading simulation, reproducible benchmark scenarios, benchmark runner helpers, and final academic documentation are implemented. The core package, solvers, benchmark helpers, Streamlit-independent app helpers, and visualization helpers are unit-tested.
 
 ## Current Repository State
 
@@ -418,7 +418,7 @@ Current roadmap status:
 | Phase 6 | Streamlit Interface | Completed |
 | Phase 7 | 3D Visualization and Unloading Simulation | Completed |
 | Phase 8 | Testing, Benchmarking, and Documentation | Completed |
-| Phase 9 | Project Quality, Reproducibility & Deployment | Planned |
+| Phase 9 | Project Quality, Reproducibility & Deployment | In progress |
 | Phase 10 | MILP Incumbent Recovery | Planned |
 | Phase 11 | Scenario & Result Export/Import | Planned |
 | Phase 12 | Visual Diagnostics | Planned |
@@ -475,6 +475,7 @@ container-ship-stowage-optimizer/
 |-- tests/
 |   `-- test_*.py
 |-- pyproject.toml
+|-- requirements.txt            # Runtime dependencies for Streamlit Cloud
 |-- LICENSE
 `-- README.md
 ```
@@ -593,7 +594,7 @@ pip install -e ".[dev]"
 This installs:
 
 - the local `stowage_optimizer` package in editable mode;
-- development dependencies such as `pytest`.
+- development dependencies such as `pytest`, `pytest-cov`, and `ruff`.
 
 Editable mode means source changes under `src/` are immediately reflected without reinstalling the package.
 
@@ -603,7 +604,37 @@ Editable mode means source changes under `src/` are immediately reflected withou
 python -m pytest
 ```
 
-### 6. Run reproducible benchmarks
+Windows PowerShell helper:
+
+```powershell
+.\run_tests.ps1
+```
+
+The helper runs the test suite with coverage reporting.
+If PowerShell blocks local scripts on your machine, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\run_tests.ps1
+```
+
+### 6. Run linting and coverage
+
+Run Ruff:
+
+```bash
+python -m ruff check .
+```
+
+Run tests with terminal coverage:
+
+```bash
+python -m pytest --cov=stowage_optimizer --cov=app --cov-report=term-missing
+```
+
+GitHub Actions runs both Ruff and the coverage-enabled test suite on pushes,
+pull requests, and manual workflow dispatches.
+
+### 7. Run reproducible benchmarks
 
 Quick smoke benchmark:
 
@@ -628,7 +659,7 @@ and CBC behavior. Use fixed GA seeds for reproducible assignments.
 If you run from a source checkout before installing editable mode, set
 `PYTHONPATH=src` for `python -m stowage_optimizer.benchmarks.runner`.
 
-### 7. Deactivate the virtual environment
+### 8. Deactivate the virtual environment
 
 ```bash
 deactivate
@@ -647,6 +678,18 @@ deactivate
 streamlit run app/main.py
 ```
 
+Windows PowerShell helper:
+
+```powershell
+.\run_app.ps1
+```
+
+If PowerShell blocks local scripts, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\run_app.ps1
+```
+
 The interface lets you configure the vessel grid, reefer slots, route,
 and objective weights, upload a container CSV (columns `id`, `weight`,
 `destination_port`, `type`) or use the built-in example, run the Greedy, MILP,
@@ -655,6 +698,26 @@ stowage view, port-by-port unloading simulation, and an algorithm comparison
 table. Validation errors are reported before any solver runs.
 
 The CSV `type` column accepts `Normal`, `Reefer`, `Flammable`, or `Oxidizer`.
+
+### Streamlit Community Cloud deployment
+
+The app is prepared for deployment on Streamlit Community Cloud. Use:
+
+- Repository: `DiegoVillazonArce/container-ship-stowage-optimizer`
+- Branch: the branch you want to publish
+- Main file path: `app/main.py`
+- Python version: `3.11`
+- Secrets: none required
+
+`requirements.txt` mirrors the runtime dependencies from `pyproject.toml`
+because Streamlit Community Cloud uses dependency files to build the hosted
+environment. Development-only tools such as `pytest`, `pytest-cov`, and `ruff`
+remain in the `dev` extra in `pyproject.toml`.
+
+For hosted runs, prefer Greedy or Genetic Algorithm on medium examples. MILP is
+kept available for small and moderate scenarios, but exact optimization can be
+slow or skipped by the app's size guard when the container-slot assignment model
+would be too large for an interactive cloud session.
 
 ---
 

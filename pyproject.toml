@@ -21,6 +21,8 @@ stowage-benchmark = "stowage_optimizer.benchmarks.runner:main"
 [project.optional-dependencies]
 dev = [
     "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "ruff>=0.6",
 ]
 
 [tool.pytest.ini_options]
@@ -28,6 +30,25 @@ testpaths = ["tests"]
 # ``app`` is on the path so the Streamlit-free helpers in ``app/app_helpers.py``
 # can be imported and unit-tested without launching Streamlit.
 pythonpath = ["src", "app"]
+
+[tool.coverage.run]
+branch = true
+source = ["stowage_optimizer", "app"]
+omit = ["app/main.py"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
+
+[tool.ruff.lint.per-file-ignores]
+"app/main.py" = ["E402"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
