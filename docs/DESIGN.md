@@ -666,12 +666,14 @@ Role:
 
 - Exact reference for small instances.
 - Provides optimal or near-optimal solutions when tractable.
+- Recovers feasible non-certified CBC incumbents under time limits as `FEASIBLE`.
 - Can report solver gap and infeasibility.
 
 Expected behavior:
 
 - Enforce hard constraints exactly.
 - Use linear objective components.
+- Report only certified optima as optimal.
 - Start with small instances, such as `6 x 4 x 4`.
 
 ### Genetic Algorithm

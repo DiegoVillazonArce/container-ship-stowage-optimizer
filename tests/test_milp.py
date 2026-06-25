@@ -10,6 +10,7 @@ from stowage_optimizer.core import (
 )
 from stowage_optimizer.core.examples import create_small_example_instance
 from stowage_optimizer.solvers import MILPSolver, SolverResult, SolverStatus
+from stowage_optimizer.solvers.milp import _BackendStatus
 
 
 def _instance(ship: Ship, route: Route, containers: tuple[Container, ...]) -> ProblemInstance:
@@ -116,6 +117,31 @@ def test_milp_reports_not_solved_separately_from_infeasible() -> None:
     assert result.solver_status_detail == "Not Solved"
     assert result.objective_value is None
     assert result.metrics.unassigned_container_count == len(instance.containers)
+
+
+def test_milp_recovers_uncertified_incumbent_as_feasible(monkeypatch) -> None:
+    # Simulate CBC's time-limit incumbent path without depending on real timing:
+    # the model still solves normally, but classification is forced to the
+    # LpSolutionIntegerFeasible interpretation.
+    instance = create_small_example_instance()
+    detail = "Solution Found (time limit incumbent; optimality not certified)"
+
+    monkeypatch.setattr(
+        MILPSolver,
+        "_classify_backend_status",
+        staticmethod(lambda _status, _solution: _BackendStatus(False, True, detail)),
+    )
+
+    result = MILPSolver().solve(instance)
+
+    assert result.status == SolverStatus.FEASIBLE
+    assert result.is_feasible
+    assert result.metrics.is_feasible
+    assert len(result.solution.assignments) == len(instance.containers)
+    assert result.objective_value is not None
+    assert result.solver_status_detail is not None
+    assert "not certified" in result.solver_status_detail
+    assert "incumbent" in result.solver_status_detail
 
 
 def test_milp_reports_infeasible_when_reefer_slot_missing() -> None:
@@ -250,36 +276,73 @@ def test_milp_rejects_non_finite_weight_before_backend() -> None:
     assert "finite weight" in result.solver_status_detail
 
 
+def test_extract_solution_tolerates_variables_without_value() -> None:
+    unset = pulp.LpVariable("unset", cat=pulp.LpBinary)
+    non_finite = pulp.LpVariable("non_finite", cat=pulp.LpBinary)
+    non_finite.varValue = float("nan")
+    selected = pulp.LpVariable("selected", cat=pulp.LpBinary)
+    selected.varValue = 1.0
+    entirely_unset = pulp.LpVariable("entirely_unset", cat=pulp.LpBinary)
+
+    solution = MILPSolver._extract_solution(
+        {
+            "PLACED": {
+                (1, 1, 1): unset,
+                (1, 1, 2): non_finite,
+                (1, 1, 3): selected,
+            },
+            "UNSET": {(1, 1, 4): entirely_unset},
+        }
+    )
+
+    assert solution.slot_for("PLACED") == (1, 1, 3)
+    assert solution.slot_for("UNSET") is None
+
+
 def test_classify_backend_status_certifies_only_proven_optimum() -> None:
     # CBC reporting LpStatusOptimal *and* LpSolutionOptimal is a proven optimum.
-    is_optimal, detail = MILPSolver._classify_backend_status(
+    backend_status = MILPSolver._classify_backend_status(
         pulp.LpStatusOptimal, pulp.LpSolutionOptimal
     )
 
-    assert is_optimal is True
-    assert detail == "Optimal"
+    assert backend_status.is_proven_optimal is True
+    assert backend_status.has_recoverable_solution is True
+    assert backend_status.detail == "Optimal"
 
 
-def test_classify_backend_status_rejects_uncertified_time_limit_incumbent() -> None:
+def test_classify_backend_status_recovers_uncertified_time_limit_incumbent() -> None:
     # Under a time limit CBC keeps status "Optimal" but sol_status only reports a
-    # feasible incumbent. This must NOT be treated as a certified optimum.
-    is_optimal, detail = MILPSolver._classify_backend_status(
+    # feasible incumbent. This must not be treated as a certified optimum, but
+    # it is recoverable if the extracted assignment passes common metrics.
+    backend_status = MILPSolver._classify_backend_status(
         pulp.LpStatusOptimal, pulp.LpSolutionIntegerFeasible
     )
 
-    assert is_optimal is False
-    assert "not certified" in detail
-    # The matching final status is NOT_SOLVED, never OPTIMAL/FEASIBLE.
+    assert backend_status.is_proven_optimal is False
+    assert backend_status.has_recoverable_solution is True
+    assert "not certified" in backend_status.detail
+    assert "incumbent" in backend_status.detail
     assert (
-        MILPSolver._solver_status(is_optimal, pulp.LpStatusOptimal, True)
+        MILPSolver._solver_status(backend_status, pulp.LpStatusOptimal, True)
+        == SolverStatus.FEASIBLE
+    )
+    assert (
+        MILPSolver._solver_status(backend_status, pulp.LpStatusOptimal, False)
         == SolverStatus.NOT_SOLVED
     )
 
 
 def test_classify_backend_status_passes_through_infeasible_and_not_solved() -> None:
-    assert MILPSolver._classify_backend_status(
+    infeasible = MILPSolver._classify_backend_status(
         pulp.LpStatusInfeasible, pulp.LpSolutionInfeasible
-    ) == (False, "Infeasible")
-    assert MILPSolver._classify_backend_status(
+    )
+    not_solved = MILPSolver._classify_backend_status(
         pulp.LpStatusNotSolved, pulp.LpSolutionNoSolutionFound
-    ) == (False, "Not Solved")
+    )
+
+    assert infeasible.is_proven_optimal is False
+    assert infeasible.has_recoverable_solution is False
+    assert infeasible.detail == "Infeasible"
+    assert not_solved.is_proven_optimal is False
+    assert not_solved.has_recoverable_solution is False
+    assert not_solved.detail == "Not Solved"

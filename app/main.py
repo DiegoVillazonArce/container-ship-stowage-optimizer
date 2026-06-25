@@ -42,7 +42,6 @@ from stowage_optimizer.core.metrics import (
     evaluate_solution,
     simulate_unloading_events,
 )
-from stowage_optimizer.solvers import SolverStatus
 from stowage_optimizer.viz import build_stowage_figure
 
 # Defaults match ``create_small_example_instance`` so the internal example runs
@@ -406,25 +405,11 @@ def render_result_detail(
         return
 
     result = entry["result"]
-    if result.is_feasible:
-        st.success(f"Feasible solution ({result.status}).")
-    elif result.is_structurally_feasible and not result.cg_within_tolerance:
-        st.warning(
-            f"Structurally feasible, but CG tolerance exceeded ({result.status}). "
-            "Review CG x/y or relax the configured tolerances."
-        )
-    elif result.status == SolverStatus.NOT_SOLVED:
-        st.warning(
-            "MILP stopped before certifying optimality; no certified plan was "
-            "returned. Increase the time limit, or compare with the Greedy/GA "
-            "solvers."
-        )
+    level, message = helpers.result_status_message(entry["algorithm"], result)
+    if level == "success":
+        st.success(message)
     else:
-        st.warning(
-            f"No feasible solution ({result.status}). "
-            "Check the violation counts and consider relaxing tolerances or "
-            "adding capacity."
-        )
+        st.warning(message)
 
     render_kpis(result)
 

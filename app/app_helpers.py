@@ -37,6 +37,7 @@ from stowage_optimizer.solvers import (
     MILPWeights,
     Solver,
     SolverResult,
+    SolverStatus,
 )
 
 REQUIRED_CONTAINER_COLUMNS: tuple[str, ...] = ("id", "weight", "destination_port", "type")
@@ -491,3 +492,49 @@ def comparison_row(algorithm_label: str, result: SolverResult) -> dict[str, obje
             round(result.objective_value, 4) if result.objective_value is not None else None
         ),
     }
+
+
+def result_status_message(algorithm_label: str, result: SolverResult) -> tuple[str, str]:
+    """Return a UI message level and text for a solver result."""
+    if is_uncertified_milp_incumbent(algorithm_label, result):
+        return (
+            "warning",
+            "MILP returned a feasible incumbent before optimality was certified. "
+            "The plan is valid, but it is not proven optimal.",
+        )
+
+    if result.is_feasible:
+        return ("success", f"Feasible solution ({result.status}).")
+
+    if result.is_structurally_feasible and not result.cg_within_tolerance:
+        return (
+            "warning",
+            f"Structurally feasible, but CG tolerance exceeded ({result.status}). "
+            "Review CG x/y or relax the configured tolerances.",
+        )
+
+    if result.status == SolverStatus.NOT_SOLVED:
+        return (
+            "warning",
+            "MILP stopped before certifying optimality and no certified or "
+            "feasible incumbent plan was returned. Increase the time limit, "
+            "or compare with the Greedy/GA solvers.",
+        )
+
+    return (
+        "warning",
+        f"No feasible solution ({result.status}). "
+        "Check the violation counts and consider relaxing tolerances or adding capacity.",
+    )
+
+
+def is_uncertified_milp_incumbent(algorithm_label: str, result: SolverResult) -> bool:
+    """Return whether a MILP result is a feasible but non-certified incumbent."""
+    detail = (result.solver_status_detail or "").lower()
+    return (
+        algorithm_label == "MILP"
+        and result.status == SolverStatus.FEASIBLE
+        and result.is_feasible
+        and "incumbent" in detail
+        and "not certified" in detail
+    )

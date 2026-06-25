@@ -390,24 +390,28 @@ Add project quality tooling, repeatable local entry points, and deployment readi
 
 Recover feasible MILP incumbent solutions when CBC reaches the time limit before proving optimality, so that useful assignments are reported instead of being replaced by an empty solution.
 
+**Status:** Completed. CBC/PuLP integer-feasible incumbents are recovered
+conservatively, evaluated through the shared metrics layer, and reported as
+`FEASIBLE` rather than `OPTIMAL` unless optimality is certified.
+
 ### User Stories
 
 - As a developer, I want the MILP solver to keep feasible incumbents found under a time limit, so that large runs can still return usable plans.
 - As a developer, I want non-optimal incumbents to be reported as `FEASIBLE`, so that solver status remains academically honest.
 - As a developer, I want recovered incumbents to include `objective_value`, so that comparisons remain meaningful.
-- As a developer, I want tests around low time limits and partially certified variables, so that the recovery path is reliable.
+- As a developer, I want deterministic tests around uncertified incumbents and partially valued variables, so that the recovery path is reliable.
 
 ### Tasks
 
-- [ ] Update the MILP solve flow to extract incumbent assignments when CBC reports an integer-feasible solution.
-- [ ] Use the existing `_classify_backend_status` distinction between `LpSolutionIntegerFeasible` and `LpSolutionOptimal`.
-- [ ] Report recovered incumbents with status `FEASIBLE`, not `OPTIMAL`.
-- [ ] Populate `objective_value` for recovered feasible incumbents.
-- [ ] Avoid returning an empty assignment when variable values define a feasible incumbent.
-- [ ] Make solution extraction tolerate variables without certified values.
-- [ ] Add a regression test for CBC's integer-feasible, non-certified incumbent path.
-- [ ] Verify that the recovered time-limited solution is non-empty and feasible when an incumbent exists.
-- [ ] Verify that variables without certified values do not break solution extraction.
+- [x] Update the MILP solve flow to extract incumbent assignments when CBC reports an integer-feasible solution.
+- [x] Use the existing `_classify_backend_status` distinction between `LpSolutionIntegerFeasible` and `LpSolutionOptimal`.
+- [x] Report recovered incumbents with status `FEASIBLE`, not `OPTIMAL`.
+- [x] Populate `objective_value` for recovered feasible incumbents.
+- [x] Avoid returning an empty assignment when variable values define a feasible incumbent.
+- [x] Make solution extraction tolerate variables without certified values.
+- [x] Add a regression test for CBC's integer-feasible, non-certified incumbent path.
+- [x] Verify that the recovered time-limited solution is non-empty and feasible when an incumbent exists.
+- [x] Verify that variables without certified values do not break solution extraction.
 
 ### Definition of Done
 

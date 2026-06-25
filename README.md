@@ -1,12 +1,12 @@
 # Container Ship Stowage Optimizer
 
-**Status:** Phases 1 through 9 completed. Phases 10 through 14 are planned roadmap extensions covering incumbent recovery, scenario/result export, visual diagnostics, local search, and an academic explanation layer. Core domain models, validation, a small example instance, the common metrics engine, the greedy baseline solver, the exact MILP reference solver, the genetic algorithm solver, the Streamlit interface, Plotly 3D visualization, port-by-port unloading simulation, reproducible benchmark scenarios, benchmark runner helpers, project quality tooling, CI, coverage reporting, deployment readiness, and final academic documentation are implemented. The core package, solvers, benchmark helpers, Streamlit-independent app helpers, and visualization helpers are unit-tested.
+**Status:** Phases 1 through 10 completed. Phases 11 through 14 are planned roadmap extensions covering scenario/result export, visual diagnostics, local search, and an academic explanation layer. Core domain models, validation, a small example instance, the common metrics engine, the greedy baseline solver, the exact MILP reference solver with incumbent recovery, the genetic algorithm solver, the Streamlit interface, Plotly 3D visualization, port-by-port unloading simulation, reproducible benchmark scenarios, benchmark runner helpers, project quality tooling, CI, coverage reporting, deployment readiness, and final academic documentation are implemented. The core package, solvers, benchmark helpers, Streamlit-independent app helpers, and visualization helpers are unit-tested.
 
 **Live app:** [container-ship-stowage-optimizer.streamlit.app](https://container-ship-stowage-optimizer.streamlit.app/)
 
 ## Current Repository State
 
-This repository contains the project planning documentation plus the completed implementation increments. The current Python package includes vessel slots and normalized coordinates, container and route models, problem instances, pre-solver validation, a small hand-checkable example, a common metrics engine (weight, utilization, center-of-gravity moments, side and end balance, constraint-violation counts, and real rehandling by simulated unloading), a common solver interface, the greedy baseline solver with optional swap-based repair, the MILP exact reference solver (PuLP/CBC) enforcing the hard constraints and minimizing the linear objective, the genetic algorithm metaheuristic solver, the Streamlit interface with Plotly 3D visualization and unloading simulation, reproducible benchmark scenarios, benchmark table exporters, and automated tests.
+This repository contains the project planning documentation plus the completed implementation increments. The current Python package includes vessel slots and normalized coordinates, container and route models, problem instances, pre-solver validation, a small hand-checkable example, a common metrics engine (weight, utilization, center-of-gravity moments, side and end balance, constraint-violation counts, and real rehandling by simulated unloading), a common solver interface, the greedy baseline solver with optional swap-based repair, the MILP exact reference solver (PuLP/CBC) enforcing the hard constraints, minimizing the linear objective, and recovering feasible non-certified incumbents, the genetic algorithm metaheuristic solver, the Streamlit interface with Plotly 3D visualization and unloading simulation, reproducible benchmark scenarios, benchmark table exporters, and automated tests.
 
 The detailed implementation plan is maintained in [ROADMAP.md](./ROADMAP.md). The roadmap is the source of truth for phase boundaries. Technical model details are documented in [docs/DESIGN.md](./docs/DESIGN.md), and benchmark reproduction notes are documented in [docs/BENCHMARKS.md](./docs/BENCHMARKS.md).
 
@@ -421,7 +421,7 @@ Current roadmap status:
 | Phase 7 | 3D Visualization and Unloading Simulation | Completed |
 | Phase 8 | Testing, Benchmarking, and Documentation | Completed |
 | Phase 9 | Project Quality, Reproducibility & Deployment | Completed |
-| Phase 10 | MILP Incumbent Recovery | Planned |
+| Phase 10 | MILP Incumbent Recovery | Completed |
 | Phase 11 | Scenario & Result Export/Import | Planned |
 | Phase 12 | Visual Diagnostics | Planned |
 | Phase 13 | Local Search after Greedy/GA | Planned |

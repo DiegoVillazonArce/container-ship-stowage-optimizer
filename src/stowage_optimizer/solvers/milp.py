@@ -28,15 +28,16 @@ install: it ships the CBC solver, so no external solver setup is required.
 Optimality is reported only when CBC certifies it. Under a time limit CBC may
 stop with a feasible incumbent while still labelling its status ``Optimal``; the
 solver inspects ``sol_status`` to tell a proven optimum (``SolverStatus.OPTIMAL``)
-from such an uncertified incumbent, which is reported as ``NOT_SOLVED`` rather
-than presented as optimal. Recovering and returning that incumbent is a separate
-future enhancement (see ROADMAP).
+from such an uncertified incumbent, which is recovered and reported as
+``SolverStatus.FEASIBLE`` only when the common metrics confirm feasibility.
 """
 
 from __future__ import annotations
 
 import time
 from dataclasses import dataclass
+from math import isfinite
+from numbers import Real
 
 import pulp
 
@@ -70,6 +71,15 @@ class MILPWeights:
     cg_lat: float = 1.0
     vertical: float = 1.0
     rehandling: float = 1.0
+
+
+@dataclass(frozen=True, slots=True)
+class _BackendStatus:
+    """MILP backend status interpreted for the shared solver contract."""
+
+    is_proven_optimal: bool
+    has_recoverable_solution: bool
+    detail: str
 
 
 class MILPSolver(Solver):
@@ -109,19 +119,15 @@ class MILPSolver(Solver):
         problem.solve(backend)
 
         runtime = time.perf_counter() - start
-        is_proven_optimal, solver_status_detail = self._classify_backend_status(
-            problem.status, problem.sol_status
-        )
+        backend_status = self._classify_backend_status(problem.status, problem.sol_status)
 
-        if is_proven_optimal:
+        if backend_status.has_recoverable_solution:
             solution = self._extract_solution(assignment_vars)
-            objective_value = pulp.value(problem.objective)
+            objective_value = self._objective_value(problem)
         else:
-            # No certified optimal solution is available. Report an empty
-            # assignment so the common metrics flag every container as
-            # unassigned, but keep the backend status distinct below. A feasible
-            # incumbent found under the time limit is intentionally discarded
-            # here; recovering it is a separate future enhancement (ROADMAP).
+            # No solution values are available. Report an empty assignment so
+            # the common metrics flag every container as unassigned, while the
+            # backend detail below preserves the solver's native outcome.
             solution = StowageSolution(())
             objective_value = None
 
@@ -132,7 +138,7 @@ class MILPSolver(Solver):
             cg_tolerance_lat=self._cg_tolerance_lat,
             min_incompatible_bay_distance=self._min_distance,
         )
-        status = self._solver_status(is_proven_optimal, problem.status, metrics.is_feasible)
+        status = self._solver_status(backend_status, problem.status, metrics.is_feasible)
 
         return SolverResult(
             solution=solution,
@@ -143,41 +149,79 @@ class MILPSolver(Solver):
             # CBC, the default PuLP backend, does not expose the MIP optimality
             # gap through PuLP's public API, so it is reported as unknown.
             gap=None,
-            solver_status_detail=solver_status_detail,
+            solver_status_detail=backend_status.detail,
         )
 
     @staticmethod
     def _classify_backend_status(
         status_code: int, sol_status_code: int
-    ) -> tuple[bool, str]:
+    ) -> _BackendStatus:
         """Decide whether CBC certified an optimum and build a status string.
 
         CBC (PuLP's default backend) leaves ``problem.status`` at
         ``LpStatusOptimal`` even when it stops at the configured time limit with
         a feasible incumbent it never proved optimal. Only ``problem.sol_status``
         separates a certified optimum (``LpSolutionOptimal``) from such an
-        uncertified incumbent (``LpSolutionIntegerFeasible``). Returning the
-        optimality flag here keeps the rest of ``solve`` from reporting an
-        unproven incumbent as ``Optimal``.
+        uncertified incumbent (``LpSolutionIntegerFeasible``). Returning both
+        signals here keeps the rest of ``solve`` from reporting an unproven
+        incumbent as ``Optimal`` while still allowing conservative recovery.
         """
+        native_status = pulp.LpStatus.get(status_code, str(status_code))
+        native_solution = pulp.LpSolution.get(sol_status_code, str(sol_status_code))
+
+        if status_code == pulp.LpStatusInfeasible:
+            return _BackendStatus(
+                is_proven_optimal=False,
+                has_recoverable_solution=False,
+                detail=native_status,
+            )
+
+        if (
+            status_code == pulp.LpStatusOptimal
+            and sol_status_code == pulp.LpSolutionOptimal
+        ):
+            return _BackendStatus(
+                is_proven_optimal=True,
+                has_recoverable_solution=True,
+                detail="Optimal",
+            )
+
+        if sol_status_code == pulp.LpSolutionIntegerFeasible:
+            return _BackendStatus(
+                is_proven_optimal=False,
+                has_recoverable_solution=True,
+                detail=f"{native_solution} (time limit incumbent; optimality not certified)",
+            )
+
         if status_code == pulp.LpStatusOptimal:
-            if sol_status_code == pulp.LpSolutionOptimal:
-                return True, "Optimal"
-            # Feasible but not certified: surface the native solution status and
-            # make the time-limit caveat explicit instead of claiming optimality.
-            native = pulp.LpSolution.get(sol_status_code, str(sol_status_code))
-            return False, f"{native} (time limit; optimality not certified)"
-        return False, pulp.LpStatus[status_code]
+            return _BackendStatus(
+                is_proven_optimal=False,
+                has_recoverable_solution=False,
+                detail=f"{native_status} ({native_solution}; optimality not certified)",
+            )
+
+        return _BackendStatus(
+            is_proven_optimal=False,
+            has_recoverable_solution=False,
+            detail=native_status,
+        )
 
     @staticmethod
     def _solver_status(
-        is_proven_optimal: bool, status_code: int, metrics_are_feasible: bool
+        backend_status: _BackendStatus, status_code: int, metrics_are_feasible: bool
     ) -> SolverStatus:
-        if is_proven_optimal:
+        if backend_status.is_proven_optimal:
             return SolverStatus.OPTIMAL if metrics_are_feasible else SolverStatus.INFEASIBLE
         if status_code == pulp.LpStatusInfeasible:
             return SolverStatus.INFEASIBLE
+        if backend_status.has_recoverable_solution and metrics_are_feasible:
+            return SolverStatus.FEASIBLE
         return SolverStatus.NOT_SOLVED
+
+    @staticmethod
+    def _objective_value(problem: pulp.LpProblem) -> float | None:
+        value = pulp.value(problem.objective)
+        return float(value) if value is not None else None
 
     # -- Model construction ----------------------------------------------
 
@@ -460,7 +504,7 @@ class MILPSolver(Solver):
         for container_id, slot_vars in assignment_vars.items():
             for position, var in slot_vars.items():
                 value = var.value()
-                if value is not None and value > 0.5:
+                if isinstance(value, Real) and isfinite(value) and value > 0.5:
                     assignment[container_id] = position
                     break
         return StowageSolution.from_mapping(assignment)

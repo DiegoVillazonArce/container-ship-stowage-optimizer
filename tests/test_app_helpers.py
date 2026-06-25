@@ -298,3 +298,44 @@ def test_comparison_row_distinguishes_cg_tolerance_failure() -> None:
     assert row["structural_feasible"] is True
     assert row["cg_ok"] is False
     assert row["operational_feasible"] is False
+
+
+def test_result_status_message_explains_uncertified_milp_incumbent() -> None:
+    instance = create_small_example_instance()
+    result = helpers.build_solver("Greedy", helpers.SolverParams()).solve(instance)
+    incumbent_result = type(result)(
+        solution=result.solution,
+        status=SolverStatus.FEASIBLE,
+        runtime_seconds=result.runtime_seconds,
+        metrics=result.metrics,
+        objective_value=1.23,
+        solver_status_detail="Solution Found (time limit incumbent; optimality not certified)",
+    )
+
+    level, message = helpers.result_status_message("MILP", incumbent_result)
+
+    assert level == "warning"
+    assert "feasible incumbent" in message
+    assert "not proven optimal" in message
+
+
+def test_result_status_message_keeps_regular_feasible_solution_success() -> None:
+    instance = create_small_example_instance()
+    result = helpers.build_solver("Greedy", helpers.SolverParams()).solve(instance)
+
+    level, message = helpers.result_status_message("Greedy", result)
+
+    assert level == "success"
+    assert "Feasible solution" in message
+
+
+def test_result_status_message_distinguishes_not_solved_without_incumbent() -> None:
+    instance = create_small_example_instance()
+    result = helpers.build_solver("MILP", helpers.SolverParams(milp_time_limit_seconds=0.0)).solve(
+        instance
+    )
+
+    level, message = helpers.result_status_message("MILP", result)
+
+    assert level == "warning"
+    assert "no certified or feasible incumbent plan" in message
