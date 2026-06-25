@@ -352,6 +352,8 @@ tests instead of visual UI assertions.
 
 Add project quality tooling, repeatable local entry points, and deployment readiness so tests, linting, coverage, and the Streamlit app can be run consistently in local development, continuous integration, and a public hosted environment.
 
+**Status:** Completed. Ruff, coverage reporting, PowerShell helper scripts, GitHub Actions CI, Streamlit Community Cloud deployment readiness, operational deployment notes, and the public hosted app URL are implemented and documented.
+
 ### User Stories
 
 - As a developer, I want Ruff linting, so that style and simple correctness issues are caught before review.
@@ -371,7 +373,7 @@ Add project quality tooling, repeatable local entry points, and deployment readi
 - [x] Verify Streamlit Community Cloud deployment prerequisites, including app entry point, declared dependencies, and repository file layout.
 - [x] Add deployment notes for publishing the Streamlit app.
 - [x] Document operational limits for hosted runs, especially MILP size and time-limit behavior.
-- [ ] Publish the Streamlit app and add the public app URL to the README.
+- [x] Publish the Streamlit app and add the public app URL to the README.
 
 ### Definition of Done
 

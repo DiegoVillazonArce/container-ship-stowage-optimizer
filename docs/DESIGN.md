@@ -794,6 +794,11 @@ They are regular `ProblemInstance` objects plus scenario-specific CG
 tolerances and incompatible-cargo separation settings. This keeps tests,
 manual benchmarks, and documentation aligned around the same inputs.
 
+Phase 9 adds project quality and deployment reproducibility: Ruff linting,
+coverage-enabled pytest runs, GitHub Actions CI, PowerShell helper scripts, and
+Streamlit Community Cloud deployment notes. The public hosted app is available
+from the README.
+
 Canonical scenarios:
 
 | Scenario | Purpose |
@@ -852,7 +857,6 @@ Possible extensions include:
 - Exact pairwise rehandling model for small instances.
 - More detailed stack weight and structural constraints.
 - Multiple dangerous cargo classes and richer separation rules.
-- Hosted Streamlit deployment readiness and operational notes.
 - Scenario export and import.
 - Downloadable benchmark or example datasets from the Streamlit interface.
 - Sensitivity analysis for objective weights.

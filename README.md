@@ -1,6 +1,8 @@
 # Container Ship Stowage Optimizer
 
-**Status:** Phases 1 through 8 completed. Phase 9 is in progress with quality tooling, reproducibility, and deployment readiness underway; Phases 10 through 14 are planned roadmap extensions covering incumbent recovery, scenario/result export, visual diagnostics, local search, and an academic explanation layer. Core domain models, validation, a small example instance, the common metrics engine, the greedy baseline solver, the exact MILP reference solver, the genetic algorithm solver, the Streamlit interface, Plotly 3D visualization, port-by-port unloading simulation, reproducible benchmark scenarios, benchmark runner helpers, and final academic documentation are implemented. The core package, solvers, benchmark helpers, Streamlit-independent app helpers, and visualization helpers are unit-tested.
+**Status:** Phases 1 through 9 completed. Phases 10 through 14 are planned roadmap extensions covering incumbent recovery, scenario/result export, visual diagnostics, local search, and an academic explanation layer. Core domain models, validation, a small example instance, the common metrics engine, the greedy baseline solver, the exact MILP reference solver, the genetic algorithm solver, the Streamlit interface, Plotly 3D visualization, port-by-port unloading simulation, reproducible benchmark scenarios, benchmark runner helpers, project quality tooling, CI, coverage reporting, deployment readiness, and final academic documentation are implemented. The core package, solvers, benchmark helpers, Streamlit-independent app helpers, and visualization helpers are unit-tested.
+
+**Live app:** [container-ship-stowage-optimizer.streamlit.app](https://container-ship-stowage-optimizer.streamlit.app/)
 
 ## Current Repository State
 
@@ -418,7 +420,7 @@ Current roadmap status:
 | Phase 6 | Streamlit Interface | Completed |
 | Phase 7 | 3D Visualization and Unloading Simulation | Completed |
 | Phase 8 | Testing, Benchmarking, and Documentation | Completed |
-| Phase 9 | Project Quality, Reproducibility & Deployment | In progress |
+| Phase 9 | Project Quality, Reproducibility & Deployment | Completed |
 | Phase 10 | MILP Incumbent Recovery | Planned |
 | Phase 11 | Scenario & Result Export/Import | Planned |
 | Phase 12 | Visual Diagnostics | Planned |
@@ -701,7 +703,11 @@ The CSV `type` column accepts `Normal`, `Reefer`, `Flammable`, or `Oxidizer`.
 
 ### Streamlit Community Cloud deployment
 
-The app is prepared for deployment on Streamlit Community Cloud. Use:
+The app is deployed at:
+
+[https://container-ship-stowage-optimizer.streamlit.app/](https://container-ship-stowage-optimizer.streamlit.app/)
+
+Deployment configuration:
 
 - Repository: `DiegoVillazonArce/container-ship-stowage-optimizer`
 - Branch: the branch you want to publish
