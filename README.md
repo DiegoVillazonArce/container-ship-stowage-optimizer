@@ -1,6 +1,6 @@
 # Container Ship Stowage Optimizer
 
-**Status:** Phases 1 through 8 completed. Core domain models, validation, a small example instance, the common metrics engine, the greedy baseline solver, the exact MILP reference solver, the genetic algorithm solver, the Streamlit interface, Plotly 3D visualization, port-by-port unloading simulation, reproducible benchmark scenarios, benchmark runner helpers, and final academic documentation are implemented. The core package, solvers, benchmark helpers, Streamlit-independent app helpers, and visualization helpers are unit-tested.
+**Status:** Phases 1 through 8 completed. Phases 9 through 14 are planned roadmap extensions covering quality tooling, deployment readiness, incumbent recovery, scenario/result export, visual diagnostics, local search, and an academic explanation layer. Core domain models, validation, a small example instance, the common metrics engine, the greedy baseline solver, the exact MILP reference solver, the genetic algorithm solver, the Streamlit interface, Plotly 3D visualization, port-by-port unloading simulation, reproducible benchmark scenarios, benchmark runner helpers, and final academic documentation are implemented. The core package, solvers, benchmark helpers, Streamlit-independent app helpers, and visualization helpers are unit-tested.
 
 ## Current Repository State
 
@@ -153,9 +153,9 @@ This is more rigorous than simply comparing total weight on each side of the ves
 
 ### 5.7 Structural Stack Weight
 
-An optional structural constraint limits the total weight supported above each container in a stack. This provides a simplified approximation of stack strength and helps avoid unrealistic loading patterns.
+An optional future structural constraint could limit the total weight supported above each container in a stack. This would provide a simplified approximation of stack strength and help avoid unrealistic loading patterns.
 
-This optional constraint is not implemented in the current Phases 1-6 codebase; it remains a future extension.
+This optional constraint is not implemented in the current completed Phases 1-8 codebase; it remains a future extension rather than one of the implemented hard constraints.
 
 ---
 
@@ -163,7 +163,7 @@ This optional constraint is not implemented in the current Phases 1-6 codebase; 
 
 The objective function optimizes quality inside the feasible region defined by the hard constraints.
 
-The planned MILP objective combines:
+The MILP objective combines:
 
 - Longitudinal center-of-gravity deviation.
 - Lateral center-of-gravity deviation.
@@ -230,7 +230,7 @@ Candidate libraries:
 
 ### Genetic Algorithm
 
-The genetic algorithm is planned for larger instances where MILP becomes computationally expensive. Its main challenges are solution encoding, feasibility-preserving mutation and crossover, efficient evaluation, and repair mechanisms for invalid assignments.
+The genetic algorithm is implemented for larger instances where MILP becomes computationally expensive. Its main challenges are solution encoding, feasibility-preserving mutation and crossover, efficient evaluation, and repair mechanisms for invalid assignments.
 
 ---
 
@@ -284,7 +284,7 @@ These checks do not prove full feasibility, but they prevent unnecessary solver 
 
 ## 9. Interface Architecture
 
-The planned user interface will be built with Streamlit to keep the project fully Python-based.
+The user interface is built with Streamlit to keep the project fully Python-based.
 
 ### Sidebar Inputs
 
@@ -418,6 +418,12 @@ Current roadmap status:
 | Phase 6 | Streamlit Interface | Completed |
 | Phase 7 | 3D Visualization and Unloading Simulation | Completed |
 | Phase 8 | Testing, Benchmarking, and Documentation | Completed |
+| Phase 9 | Project Quality, Reproducibility & Deployment | Planned |
+| Phase 10 | MILP Incumbent Recovery | Planned |
+| Phase 11 | Scenario & Result Export/Import | Planned |
+| Phase 12 | Visual Diagnostics | Planned |
+| Phase 13 | Local Search after Greedy/GA | Planned |
+| Phase 14 | Academic Explanation & Learning Mode | Planned |
 
 The implemented benchmark layer compares algorithms through shared final metrics. Raw internal objective values are reported when available, but they should not be interpreted as equivalent across Greedy, MILP, and Genetic Algorithm runs.
 
@@ -425,13 +431,13 @@ The implemented benchmark layer compares algorithms through shared final metrics
 
 ## 15. Technology Stack
 
-The planned stack is intentionally Python-centered:
+The stack is intentionally Python-centered:
 
 | Technology | Role |
 | --- | --- |
 | Python | Core implementation language |
 | Streamlit | Web application interface |
-| OR-Tools / PuLP / Pyomo | MILP optimization |
+| PuLP / CBC | MILP optimization |
 | NumPy / Pandas | Data handling and numerical calculations |
 | Plotly | 3D visualization |
 | pytest | Automated testing |
@@ -468,7 +474,7 @@ container-ship-stowage-optimizer/
 |           `-- plot3d.py       # Plotly visualization helpers
 |-- tests/
 |   `-- test_*.py
-|-- requirements.txt
+|-- pyproject.toml
 |-- LICENSE
 `-- README.md
 ```
@@ -711,12 +717,17 @@ Safe optimizations that preserve the current model:
 - caching repeated GA fitness and metrics computations;
 - faster stack indexing for real rehandling simulation.
 
+Near-term product, presentation, and reproducibility work is tracked in
+ROADMAP phases 9-14, including hosted Streamlit deployment readiness, scenario
+and result exports, downloadable example datasets, richer visual diagnostics,
+local search post-processing, and an academic explanation tab.
+
 Higher-risk heuristic reductions should be documented separately because they
 can change the explored search space:
 
 - pruning candidate bays by destination or cargo priority;
 - limiting GA candidates for medium and large scenarios;
-- hybrid Greedy plus local search;
+- hybrid solver workflows beyond the planned swap-based local search;
 - decomposition or rolling-horizon methods for larger MILP experiments.
 
 ---

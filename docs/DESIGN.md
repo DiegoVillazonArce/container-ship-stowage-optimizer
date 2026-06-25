@@ -286,9 +286,9 @@ The model uses moment-based CG control instead of only comparing total weight by
 
 ### Structural Stack Weight
 
-The model may include a simplified structural stack weight constraint. For each stack `(b, r)` and tier `t`, the total weight above a container should not exceed a maximum supported weight `M`:
+The model may include a simplified structural stack weight constraint in a future extension. For each stack `(b, r)` and tier `t`, the total weight above a container should not exceed a maximum supported weight `M`:
 
-This optional constraint is not implemented in the current Phases 1-6 codebase; it is documented as a future extension.
+This optional constraint is not implemented in the current completed Phases 1-8 codebase; it is documented as a future extension rather than an implemented hard constraint.
 
 ```text
 sum over t' > t, c of weight[c] * x[c, (b, r, t')]
@@ -852,9 +852,12 @@ Possible extensions include:
 - Exact pairwise rehandling model for small instances.
 - More detailed stack weight and structural constraints.
 - Multiple dangerous cargo classes and richer separation rules.
+- Hosted Streamlit deployment readiness and operational notes.
 - Scenario export and import.
+- Downloadable benchmark or example datasets from the Streamlit interface.
 - Sensitivity analysis for objective weights.
-- Local search improvement after Greedy construction.
+- More advanced visual diagnostics and academic explanation inside the app.
+- Local search improvement after Greedy or Genetic Algorithm outputs.
 - Hybrid GA with repair and local optimization.
 - Decomposition methods for large MILP instances.
 - Parallel fitness evaluation for the Genetic Algorithm.

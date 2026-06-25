@@ -4,7 +4,7 @@
 
 This roadmap defines a lightweight Scrum-style development plan for the **Container Ship Stowage Optimizer**. It is intended for an individual academic project, so it avoids heavy process overhead while still organizing the work into clear, testable increments.
 
-The goal is to move from a small correct optimization core to comparable algorithms, then to an interactive Streamlit application with 3D visualization and unloading simulation.
+The goal is to move from a small correct optimization core to comparable algorithms, then to an interactive Streamlit application with 3D visualization, unloading simulation, reproducible exports, public deployment readiness, richer diagnostics, and academic explanation.
 
 ## Development Philosophy
 
@@ -346,6 +346,210 @@ tests instead of visual UI assertions.
 - Algorithm comparison uses common final metrics.
 - Documentation explains the mathematical model, implementation plan, assumptions, limitations, and future optimization opportunities.
 
+## Phase 9 — Project Quality, Reproducibility & Deployment
+
+### Goal
+
+Add project quality tooling, repeatable local entry points, and deployment readiness so tests, linting, coverage, and the Streamlit app can be run consistently in local development, continuous integration, and a public hosted environment.
+
+### User Stories
+
+- As a developer, I want Ruff linting, so that style and simple correctness issues are caught before review.
+- As a developer, I want GitHub Actions to run tests and linting, so that regressions are detected automatically.
+- As a developer, I want test coverage reporting, so that weakly tested areas are visible.
+- As a developer, I want PowerShell startup scripts, so that the app and tests can be launched consistently on Windows.
+- As a developer, I want the Streamlit app prepared for hosted deployment, so that the project can be shared through a public link.
+
+### Tasks
+
+- [ ] Add Ruff linting configuration.
+- [ ] Add a GitHub Actions workflow that runs `pytest`.
+- [ ] Add a GitHub Actions workflow step that runs `ruff`.
+- [ ] Add test coverage reporting.
+- [ ] Add `run_app.ps1` for launching the Streamlit app.
+- [ ] Add `run_tests.ps1` for running the test suite.
+- [ ] Verify Streamlit Community Cloud deployment prerequisites, including app entry point, declared dependencies, and repository file layout.
+- [ ] Add deployment notes for publishing the Streamlit app.
+- [ ] Document operational limits for hosted runs, especially MILP size and time-limit behavior.
+
+### Definition of Done
+
+- Ruff can be run locally and in continuous integration.
+- GitHub Actions runs tests and linting for the project.
+- Test coverage can be generated and reviewed.
+- PowerShell scripts provide repeatable app and test entry points.
+- The repository is ready for Streamlit Community Cloud deployment and documents the deployment process.
+
+## Phase 10 — MILP Incumbent Recovery
+
+### Goal
+
+Recover feasible MILP incumbent solutions when CBC reaches the time limit before proving optimality, so that useful assignments are reported instead of being replaced by an empty solution.
+
+### User Stories
+
+- As a developer, I want the MILP solver to keep feasible incumbents found under a time limit, so that large runs can still return usable plans.
+- As a developer, I want non-optimal incumbents to be reported as `FEASIBLE`, so that solver status remains academically honest.
+- As a developer, I want recovered incumbents to include `objective_value`, so that comparisons remain meaningful.
+- As a developer, I want tests around low time limits and partially certified variables, so that the recovery path is reliable.
+
+### Tasks
+
+- [ ] Update the MILP solve flow to extract incumbent assignments when CBC reports an integer-feasible solution.
+- [ ] Use the existing `_classify_backend_status` distinction between `LpSolutionIntegerFeasible` and `LpSolutionOptimal`.
+- [ ] Report recovered incumbents with status `FEASIBLE`, not `OPTIMAL`.
+- [ ] Populate `objective_value` for recovered feasible incumbents.
+- [ ] Avoid returning an empty assignment when variable values define a feasible incumbent.
+- [ ] Make solution extraction tolerate variables without certified values.
+- [ ] Add a regression test for CBC's integer-feasible, non-certified incumbent path.
+- [ ] Verify that the recovered time-limited solution is non-empty and feasible when an incumbent exists.
+- [ ] Verify that variables without certified values do not break solution extraction.
+
+### Definition of Done
+
+- The MILP solver can return a feasible incumbent when CBC stops at the time limit.
+- Time-limited feasible incumbents are marked `FEASIBLE`.
+- Optimal solutions remain marked `OPTIMAL`.
+- Recovered incumbents include an objective value when the backend provides one.
+- Tests cover incumbent recovery and uncertified variable extraction behavior.
+
+## Phase 11 — Scenario & Result Export/Import
+
+### Goal
+
+Add Streamlit export and import features for complete scenarios and downloadable result tables, making app experiments reproducible outside the interactive session.
+
+### User Stories
+
+- As a developer, I want to export a complete scenario as JSON, so that a configured instance can be reproduced later.
+- As a developer, I want to import a scenario JSON file, so that saved experiments can be rerun without manual setup.
+- As a developer, I want to download the final stowage plan as CSV, so that results can be inspected in external tools.
+- As a developer, I want to download metrics and algorithm comparisons as CSV, so that benchmark evidence can be shared and archived.
+- As a developer, I want downloadable example datasets, so that larger test scenarios can be tried without leaving the app.
+
+### Tasks
+
+- [ ] Define a JSON representation for the complete Streamlit scenario.
+- [ ] Include vessel dimensions, route, containers, reefer configuration, objective weights, tolerances, and solver settings in the scenario export.
+- [ ] Add a scenario JSON download control.
+- [ ] Add a scenario JSON upload and import path.
+- [ ] Validate imported scenarios before creating a `ProblemInstance`.
+- [ ] Add round-trip tests for scenario export and import.
+- [ ] Add CSV download for the final stowage plan.
+- [ ] Add CSV download for final metrics.
+- [ ] Add CSV download for the algorithm comparison table.
+- [ ] Add downloadable example container CSVs for 20, 40, 60, and 80 containers.
+- [ ] Add short descriptions for the bundled example datasets in the Streamlit UI.
+- [ ] Use stable column names for exported result tables.
+
+### Definition of Done
+
+- A Streamlit scenario can be exported to JSON and imported back into the app.
+- Scenario round-trips reproduce the same problem instance.
+- The final stowage plan can be downloaded as CSV.
+- Final metrics can be downloaded as CSV.
+- Algorithm comparison results can be downloaded as CSV.
+- Bundled example datasets can be downloaded from the Streamlit interface.
+
+## Phase 12 — Visual Diagnostics
+
+### Goal
+
+Enrich the Streamlit diagnostics layer with structured visual explanations of balance, center of gravity, constraint violations, and algorithm differences.
+
+### User Stories
+
+- As a developer, I want a bay-row balance map, so that weight distribution issues are visible at a glance.
+- As a developer, I want the center of gravity marked visually, so that balance quality is easier to interpret.
+- As a developer, I want readable violation explanations, so that infeasible or repaired solutions can be understood.
+- As a developer, I want side-by-side algorithm diagnostics, so that solver tradeoffs are easier to compare.
+
+### Tasks
+
+- [ ] Build a bay-row balance map from structured result data.
+- [ ] Mark the computed center of gravity in the visual diagnostics.
+- [ ] Add readable explanations for reefer, stack continuity, incompatible cargo, and CG violations.
+- [ ] Link violation explanations to affected containers, slots, or aggregate metrics when available.
+- [ ] Add side-by-side comparison between algorithm results.
+- [ ] Reuse the structured scenario and result data from Phase 11.
+- [ ] Add tests for diagnostic data preparation helpers.
+
+### Definition of Done
+
+- Streamlit can display a bay-row balance diagnostic.
+- The computed center of gravity is visible in the diagnostics.
+- Constraint violations are explained in readable terms.
+- Algorithm outputs can be compared side by side.
+- Diagnostic data preparation is covered by automated tests.
+
+## Phase 13 — Local Search after Greedy/GA
+
+### Goal
+
+Add a hard-constraint-preserving local search step after Greedy or GA, using container swaps to improve horizontal CG and rehandling without changing the core solver formulations.
+
+### User Stories
+
+- As a developer, I want swap-based local search after Greedy or GA, so that constructive and evolutionary solutions can be improved.
+- As a developer, I want local search to rebalance horizontal CG even when structural constraints are already feasible, so that the documented Greedy limitation is addressed.
+- As a developer, I want every accepted move to preserve hard constraints, so that post-processing cannot invalidate a solution.
+- As a developer, I want clear acceptance and stopping criteria, so that local search behavior is reproducible.
+
+### Tasks
+
+- [ ] Review the documented Greedy limitation around repair not rebalancing solutions that only fail horizontal CG.
+- [ ] Define a swap neighborhood for assigned containers.
+- [ ] Add hard-constraint checks for candidate swaps.
+- [ ] Score candidate swaps using horizontal CG deviation and rehandling impact.
+- [ ] Define an acceptance criterion for improving or controlled non-worsening swaps.
+- [ ] Define stopping criteria based on iterations, lack of improvement, and optional runtime.
+- [ ] Integrate local search as optional post-processing after Greedy.
+- [ ] Integrate local search as optional post-processing after GA.
+- [ ] Report local-search runtime, iteration count, and improvement metrics.
+- [ ] Add tests showing that local search preserves hard constraints.
+- [ ] Add tests showing that local search can improve CG or rehandling on hand-checkable instances.
+
+### Definition of Done
+
+- Greedy and GA can optionally run a local search post-processing step.
+- Accepted swaps preserve hard constraints.
+- Local search uses clear acceptance and stopping criteria.
+- Improvement in CG or rehandling is reported when it occurs.
+- Tests cover constraint preservation and measurable improvement cases.
+
+## Phase 14 — Academic Explanation & Learning Mode
+
+### Goal
+
+Add a dedicated Streamlit learning layer that explains the stowage problem, the optimization model, the implemented algorithms, and the academic assumptions from simple concepts through more technical details.
+
+### User Stories
+
+- As a developer, I want the app to explain the container stowage problem in plain language, so that non-specialist users can understand what the project solves.
+- As a developer, I want the app to explain constraints, objectives, and metrics, so that the optimization results are interpretable.
+- As a developer, I want Greedy, MILP, and Genetic Algorithm behavior described at different levels of detail, so that users can connect solver outputs to the underlying methods.
+- As a developer, I want assumptions and limitations presented clearly, so that the academic scope is honest and defensible.
+
+### Tasks
+
+- [ ] Add a dedicated Streamlit tab or page for project explanation.
+- [ ] Explain the stowage problem from simple terminology to the formal optimization view.
+- [ ] Describe vessel slots, containers, route order, and unloading pressure with small examples.
+- [ ] Explain hard constraints, objective terms, and final metrics using readable text and compact formulas.
+- [ ] Explain Greedy, MILP, and Genetic Algorithm approaches and when each is useful.
+- [ ] Include academic assumptions, simplifications, and limitations.
+- [ ] Add diagrams, tables, or small visual examples where they make the explanation easier to follow.
+- [ ] Keep explanatory content separate from solver logic so it can be tested and maintained independently.
+- [ ] Add tests for any structured content helpers used by the learning layer.
+
+### Definition of Done
+
+- The Streamlit app includes a dedicated explanation tab or page.
+- Users can understand the problem, constraints, objective terms, algorithms, metrics, assumptions, and limitations without reading the source code.
+- The explanation supports both plain-language and more technical reading paths.
+- Academic assumptions are presented clearly and consistently with README and DESIGN documentation.
+- Any reusable explanation helpers are covered by automated tests.
+
 ## Suggested GitHub Issues
 
 - Create core `Slot`, `Ship`, and `Container` models.
@@ -395,16 +599,11 @@ The MVP is complete when:
 - Add configurable vessel templates.
 - Add richer dangerous cargo classes beyond `Flammable` and `Oxidizer`.
 - Add stack weight limits by container type or tier.
-- Add scenario export to JSON or CSV.
-- Add benchmark result export.
 - Add sensitivity analysis for objective weights.
 - Add decomposition or rolling-horizon methods for larger instances.
-- Recover feasible non-optimal MILP incumbent solutions when time limits stop CBC before optimality is certified.
-- Add more advanced local search after Greedy or GA.
 - Migrate the MILP implementation to the PuLP 4 API and replace deprecated CBC command usage.
-- Add richer Streamlit visual diagnostics.
 - Add optional persistence with SQLite.
-- Add documentation comparing academic assumptions with real maritime planning constraints.
+- Add optional static type checking with mypy.
 
 ### Scalability and Solver Optimization
 
@@ -414,5 +613,5 @@ The MVP is complete when:
 - Add warm-start support for MILP from Greedy or GA solutions.
 - Cache repeated metric and fitness computations in the Genetic Algorithm.
 - Optimize real rehandling simulation for larger instances.
-- Explore hybrid approaches, such as Greedy construction followed by local search.
+- Explore broader hybrid approaches beyond the planned swap-based local search.
 - Separate safe model-preserving optimizations from heuristic search-space reductions.
