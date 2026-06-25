@@ -427,6 +427,10 @@ conservatively, evaluated through the shared metrics layer, and reported as
 
 Add Streamlit export and import features for complete scenarios and downloadable result tables, making app experiments reproducible outside the interactive session.
 
+**Status:** Completed. Streamlit can export/import complete scenario JSON,
+download final plan/metrics/comparison CSVs, and expose bundled 20/40/60/80
+container datasets from the UI.
+
 ### User Stories
 
 - As a developer, I want to export a complete scenario as JSON, so that a configured instance can be reproduced later.
@@ -437,18 +441,18 @@ Add Streamlit export and import features for complete scenarios and downloadable
 
 ### Tasks
 
-- [ ] Define a JSON representation for the complete Streamlit scenario.
-- [ ] Include vessel dimensions, route, containers, reefer configuration, objective weights, tolerances, and solver settings in the scenario export.
-- [ ] Add a scenario JSON download control.
-- [ ] Add a scenario JSON upload and import path.
-- [ ] Validate imported scenarios before creating a `ProblemInstance`.
-- [ ] Add round-trip tests for scenario export and import.
-- [ ] Add CSV download for the final stowage plan.
-- [ ] Add CSV download for final metrics.
-- [ ] Add CSV download for the algorithm comparison table.
-- [ ] Add downloadable example container CSVs for 20, 40, 60, and 80 containers.
-- [ ] Add short descriptions for the bundled example datasets in the Streamlit UI.
-- [ ] Use stable column names for exported result tables.
+- [x] Define a JSON representation for the complete Streamlit scenario.
+- [x] Include vessel dimensions, route, containers, reefer configuration, objective weights, tolerances, and solver settings in the scenario export.
+- [x] Add a scenario JSON download control.
+- [x] Add a scenario JSON upload and import path.
+- [x] Validate imported scenarios before creating a `ProblemInstance`.
+- [x] Add round-trip tests for scenario export and import.
+- [x] Add CSV download for the final stowage plan.
+- [x] Add CSV download for final metrics.
+- [x] Add CSV download for the algorithm comparison table.
+- [x] Add downloadable example container CSVs for 20, 40, 60, and 80 containers.
+- [x] Add short descriptions for the bundled example datasets in the Streamlit UI.
+- [x] Use stable column names for exported result tables.
 
 ### Definition of Done
 

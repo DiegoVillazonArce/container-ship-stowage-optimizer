@@ -5,10 +5,21 @@ Streamlit UI in ``app/main.py`` is a thin layer over these functions and is not
 unit-tested here.
 """
 
+import csv
+import io
+import json
+
 import pytest
 
 import app_helpers as helpers
-from stowage_optimizer.core import Container, ContainerType, ProblemInstance, Route, Ship
+from stowage_optimizer.core import (
+    Container,
+    ContainerType,
+    ProblemInstance,
+    Route,
+    Ship,
+    validate_instance,
+)
 from stowage_optimizer.core.examples import create_small_example_instance
 from stowage_optimizer.solvers import GeneticSolver, GreedySolver, MILPSolver, SolverStatus
 
@@ -339,3 +350,174 @@ def test_result_status_message_distinguishes_not_solved_without_incumbent() -> N
 
     assert level == "warning"
     assert "no certified or feasible incumbent plan" in message
+
+
+# -- Phase 11 scenario and result export/import ------------------------------
+
+
+def test_scenario_export_json_contains_complete_payload() -> None:
+    instance = create_small_example_instance()
+    params = helpers.SolverParams(
+        cg_lon=2.0,
+        cg_lat=3.0,
+        vertical=4.0,
+        rehandling=5.0,
+        cg_tolerance_lon=0.35,
+        cg_tolerance_lat=0.45,
+        min_incompatible_bay_distance=2,
+        milp_time_limit_seconds=12.5,
+        ga_population_size=24,
+        ga_max_generations=30,
+        ga_mutation_probability=0.10,
+        ga_crossover_probability=0.70,
+        ga_random_seed=99,
+    )
+
+    payload = json.loads(
+        helpers.scenario_to_json(instance, params, ("Greedy", "Genetic Algorithm"))
+    )
+
+    assert payload["schema_version"] == helpers.SCENARIO_SCHEMA_VERSION
+    assert payload["vessel"] == {"bays": 6, "rows": 4, "tiers": 4}
+    assert payload["route"] == ["Panama", "Brazil", "Spain"]
+    assert payload["containers"][0] == {
+        "id": "C001",
+        "weight": 28.5,
+        "destination_port": "Panama",
+        "type": "Normal",
+    }
+    assert payload["reefer"]["slots"][0] == {"bay": 1, "row": 1, "tier": 1}
+    assert payload["cg_tolerances"] == {"longitudinal": 0.35, "lateral": 0.45}
+    assert payload["objective_weights"] == {
+        "cg_lon": 2.0,
+        "cg_lat": 3.0,
+        "vertical": 4.0,
+        "rehandling": 5.0,
+    }
+    assert payload["solver_settings"]["selected_algorithms"] == [
+        "Greedy",
+        "Genetic Algorithm",
+    ]
+    assert payload["solver_settings"]["milp_time_limit_seconds"] == 12.5
+    assert payload["solver_settings"]["ga_random_seed"] == 99
+
+
+def test_import_scenario_json_round_trip_reproduces_payload() -> None:
+    instance = create_small_example_instance()
+    params = helpers.SolverParams(
+        cg_tolerance_lon=0.15,
+        cg_tolerance_lat=0.20,
+        milp_time_limit_seconds=None,
+        ga_random_seed=None,
+    )
+    original = helpers.scenario_to_json(instance, params, ("Greedy", "MILP"))
+
+    imported = helpers.import_scenario_json(original)
+
+    assert imported.ok
+    assert imported.instance is not None
+    assert imported.params == params
+    assert imported.algorithms == ("Greedy", "MILP")
+    assert helpers.scenario_to_dict(
+        imported.instance, imported.params, imported.algorithms
+    ) == json.loads(original)
+
+
+def test_import_scenario_json_reports_invalid_domain_data() -> None:
+    instance = create_small_example_instance()
+    payload = helpers.scenario_to_dict(instance, helpers.SolverParams(), ("Greedy",))
+    payload["containers"][0]["destination_port"] = "Atlantis"
+
+    imported = helpers.import_scenario_json(json.dumps(payload))
+
+    assert not imported.ok
+    assert imported.instance is None
+    assert any("not included in the route" in error for error in imported.errors)
+
+
+def test_stowage_plan_csv_uses_stable_columns() -> None:
+    instance = create_small_example_instance()
+    result = helpers.build_solver("Greedy", helpers.SolverParams()).solve(instance)
+
+    csv_text = helpers.stowage_plan_csv(instance, result.solution)
+    reader = csv.DictReader(io.StringIO(csv_text))
+    rows = list(reader)
+
+    assert reader.fieldnames == list(helpers.PLAN_CSV_COLUMNS)
+    assert len(rows) == len(instance.containers)
+    assert rows[0]["container_id"]
+    assert rows[0]["bay"]
+    assert rows[0]["destination_port"] in instance.route.ports
+
+
+def test_metrics_csv_uses_stable_columns_and_metric_keys() -> None:
+    instance = create_small_example_instance()
+    result = helpers.build_solver("Greedy", helpers.SolverParams()).solve(instance)
+
+    csv_text = helpers.metrics_csv(result.metrics.as_dict())
+    reader = csv.DictReader(io.StringIO(csv_text))
+    rows = list(reader)
+    metrics = {row["metric"]: row["value"] for row in rows}
+
+    assert reader.fieldnames == list(helpers.METRICS_CSV_COLUMNS)
+    assert "total_weight" in metrics
+    assert "slot_utilization" in metrics
+    assert "is_feasible" in metrics
+
+
+def test_comparison_csv_uses_stable_columns() -> None:
+    instance = create_small_example_instance()
+    result = helpers.build_solver("Greedy", helpers.SolverParams()).solve(instance)
+    row = helpers.comparison_row("Greedy", result)
+
+    csv_text = helpers.comparison_csv([row])
+    reader = csv.DictReader(io.StringIO(csv_text))
+    rows = list(reader)
+
+    assert reader.fieldnames == list(helpers.COMPARISON_CSV_COLUMNS)
+    assert len(rows) == 1
+    assert rows[0]["algorithm"] == "Greedy"
+    assert rows[0]["status"] == "feasible"
+
+
+def test_bundled_example_datasets_are_available_with_current_schema() -> None:
+    datasets = helpers.example_dataset_catalog()
+
+    assert tuple(dataset.size for dataset in datasets) == helpers.EXAMPLE_DATASET_SIZES
+    for dataset in datasets:
+        reader = csv.DictReader(io.StringIO(dataset.csv_text))
+        rows = list(reader)
+        parsed = helpers.parse_containers_csv(dataset.csv_text)
+
+        assert dataset.file_name == f"containers_{dataset.size}.csv"
+        assert dataset.description
+        assert reader.fieldnames == list(helpers.REQUIRED_CONTAINER_COLUMNS)
+        assert len(rows) == dataset.size
+        assert parsed.ok
+        assert len(parsed.containers) == dataset.size
+
+
+def test_bundled_example_datasets_validate_with_default_scenario() -> None:
+    ship = Ship(
+        bays=6,
+        rows=4,
+        tiers=4,
+        reefer_slots=((1, 1, 1), (1, 2, 1), (2, 1, 1), (2, 2, 1)),
+    )
+    route = Route(("Panama", "Brazil", "Spain"))
+
+    for dataset in helpers.example_dataset_catalog():
+        parsed = helpers.parse_containers_csv(dataset.csv_text)
+        assert parsed.ok
+
+        instance = ProblemInstance(
+            ship=ship,
+            containers=parsed.containers,
+            route=route,
+        )
+        validation = validate_instance(instance)
+
+        assert validation.is_valid, (
+            f"{dataset.file_name} should validate with the default app scenario: "
+            f"{[issue.message for issue in validation.errors]}"
+        )

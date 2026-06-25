@@ -51,6 +51,7 @@ DEFAULT_ROWS = 4
 DEFAULT_TIERS = 4
 DEFAULT_REEFER_TEXT = "(1, 1, 1)\n(1, 2, 1)\n(2, 1, 1)\n(2, 2, 1)"
 DEFAULT_ROUTE_TEXT = "Panama, Brazil, Spain"
+IMPORTED_SCENARIO_SOURCE = "Imported scenario JSON"
 
 CSV_TEMPLATE = (
     "id,weight,destination_port,type\n"
@@ -88,46 +89,293 @@ class SidebarConfig:
 # --------------------------------------------------------------------------- #
 
 
+def _render_scenario_importer() -> None:
+    """Render the JSON upload path and apply valid scenarios to widget state."""
+    message = st.session_state.pop("scenario_import_message", None)
+    if message:
+        st.sidebar.success(message)
+
+    stored_errors = st.session_state.pop("scenario_import_errors", None)
+    if stored_errors:
+        st.sidebar.error("Scenario import failed:")
+        for error in stored_errors:
+            st.sidebar.markdown(f"- {error}")
+
+    st.sidebar.subheader("Scenario JSON")
+    uploaded = st.sidebar.file_uploader(
+        "Import scenario JSON",
+        type=["json"],
+        key="scenario_json_upload",
+        help="Loads vessel, route, containers, reefer slots, tolerances, weights, and solver settings.",
+    )
+    if uploaded is None:
+        return
+
+    if not st.sidebar.button("Import scenario", use_container_width=True):
+        return
+
+    try:
+        text = uploaded.getvalue().decode("utf-8-sig")
+    except UnicodeDecodeError:
+        st.session_state["scenario_import_errors"] = (
+            "Could not decode the scenario JSON as UTF-8.",
+        )
+        st.rerun()
+
+    result = helpers.import_scenario_json(text)
+    if not result.ok:
+        st.session_state["scenario_import_errors"] = result.errors
+        st.rerun()
+
+    if result.instance is None:
+        st.session_state["scenario_import_errors"] = (
+            "Scenario import succeeded without a problem instance. "
+            "Please export the scenario again and retry.",
+        )
+        st.rerun()
+
+    _apply_imported_scenario(result)
+    st.session_state["scenario_import_message"] = "Scenario imported and validated."
+    st.rerun()
+
+
+def _ensure_sidebar_defaults() -> None:
+    """Initialize keyed widgets once so imports can safely overwrite them."""
+    defaults = {
+        "container_upload_nonce": 0,
+        "scenario_bays": DEFAULT_BAYS,
+        "scenario_rows": DEFAULT_ROWS,
+        "scenario_tiers": DEFAULT_TIERS,
+        "scenario_reefer_text": DEFAULT_REEFER_TEXT,
+        "scenario_route_text": DEFAULT_ROUTE_TEXT,
+        "scenario_algorithms": ["Greedy"],
+        "scenario_cg_tolerance_lon": DEFAULT_CG_TOLERANCE_LON,
+        "scenario_cg_tolerance_lat": DEFAULT_CG_TOLERANCE_LAT,
+        "scenario_weight_cg_lon": 1.0,
+        "scenario_weight_cg_lat": 1.0,
+        "scenario_weight_vertical": 1.0,
+        "scenario_weight_rehandling": 1.0,
+        "scenario_min_incompatible_distance": DEFAULT_MIN_INCOMPATIBLE_BAY_DISTANCE,
+        "scenario_milp_time_limit_seconds": 10.0,
+        "scenario_ga_population_size": helpers.GA_PRESETS["Balanced"]["population_size"],
+        "scenario_ga_max_generations": helpers.GA_PRESETS["Balanced"]["max_generations"],
+        "scenario_ga_mutation_probability": 0.05,
+        "scenario_ga_crossover_probability": 0.80,
+        "scenario_ga_use_seed": True,
+        "scenario_ga_random_seed": 42,
+    }
+    for key, value in defaults.items():
+        st.session_state.setdefault(key, value)
+
+
+def _apply_imported_scenario(result: helpers.ScenarioImportResult) -> None:
+    """Copy a validated scenario into Streamlit widget state."""
+    if result.instance is None:
+        raise ValueError("Cannot apply an imported scenario without a problem instance.")
+
+    instance = result.instance
+    params = result.params
+
+    st.session_state["scenario_bays"] = instance.ship.bays
+    st.session_state["scenario_rows"] = instance.ship.rows
+    st.session_state["scenario_tiers"] = instance.ship.tiers
+    st.session_state["scenario_reefer_text"] = helpers.scenario_reefer_text(instance)
+    st.session_state["scenario_route_text"] = ", ".join(instance.route.ports)
+    st.session_state["scenario_algorithms"] = list(result.algorithms)
+    st.session_state["scenario_cg_tolerance_lon"] = params.cg_tolerance_lon
+    st.session_state["scenario_cg_tolerance_lat"] = params.cg_tolerance_lat
+    st.session_state["scenario_weight_cg_lon"] = params.cg_lon
+    st.session_state["scenario_weight_cg_lat"] = params.cg_lat
+    st.session_state["scenario_weight_vertical"] = params.vertical
+    st.session_state["scenario_weight_rehandling"] = params.rehandling
+    st.session_state["scenario_min_incompatible_distance"] = (
+        params.min_incompatible_bay_distance
+    )
+    st.session_state["scenario_milp_time_limit_seconds"] = (
+        params.milp_time_limit_seconds if params.milp_time_limit_seconds is not None else 0.0
+    )
+    st.session_state["scenario_ga_population_size"] = params.ga_population_size
+    st.session_state["scenario_ga_max_generations"] = params.ga_max_generations
+    st.session_state["scenario_ga_mutation_probability"] = params.ga_mutation_probability
+    st.session_state["scenario_ga_crossover_probability"] = params.ga_crossover_probability
+    st.session_state["scenario_ga_use_seed"] = params.ga_random_seed is not None
+    st.session_state["scenario_ga_random_seed"] = (
+        params.ga_random_seed if params.ga_random_seed is not None else 42
+    )
+    st.session_state["imported_container_csv_text"] = helpers.containers_to_csv_text(
+        instance.containers
+    )
+    st.session_state["imported_container_source"] = IMPORTED_SCENARIO_SOURCE
+    st.session_state["container_upload_nonce"] = (
+        st.session_state.get("container_upload_nonce", 0) + 1
+    )
+
+
+def _clear_imported_containers() -> None:
+    """Remove imported container CSV state and reset the upload widget."""
+    st.session_state.pop("imported_container_csv_text", None)
+    st.session_state.pop("imported_container_source", None)
+    st.session_state["container_upload_nonce"] = (
+        st.session_state.get("container_upload_nonce", 0) + 1
+    )
+
+
+def _render_imported_container_notice() -> None:
+    """Explain that containers are already loaded from an imported scenario."""
+    imported_csv_text = st.session_state.get("imported_container_csv_text")
+    if imported_csv_text is None:
+        return
+
+    parsed = helpers.parse_containers_csv(imported_csv_text)
+    if parsed.ok:
+        message = (
+            f"{len(parsed.containers)} containers loaded from the imported scenario. "
+            "Upload a CSV below only if you want to replace them."
+        )
+    else:
+        message = (
+            "Containers were loaded from the imported scenario. "
+            "Upload a CSV below only if you want to replace them."
+        )
+
+    st.sidebar.info(message)
+    st.sidebar.download_button(
+        "Download loaded containers CSV",
+        data=imported_csv_text,
+        file_name="imported_scenario_containers.csv",
+        mime="text/csv",
+        key="download_imported_containers_csv",
+        use_container_width=True,
+    )
+    if st.sidebar.button(
+        "Clear imported containers",
+        key="clear_imported_containers",
+        use_container_width=True,
+    ):
+        _clear_imported_containers()
+        st.rerun()
+
+
+def _render_current_scenario_download(config: SidebarConfig) -> None:
+    """Render a JSON download for the currently configured scenario."""
+    st.sidebar.subheader("Export scenario")
+    instance, errors, _summary = build_scenario(config)
+    if errors or instance is None:
+        st.sidebar.caption("Fix scenario inputs before exporting JSON.")
+        return
+
+    validation = validate_instance(instance)
+    if not validation.is_valid:
+        st.sidebar.caption("Fix validation errors before exporting JSON.")
+        return
+
+    st.sidebar.download_button(
+        "Download scenario JSON",
+        data=helpers.scenario_to_json(instance, config.params, config.algorithms),
+        file_name="stowage_scenario.json",
+        mime="application/json",
+        use_container_width=True,
+    )
+
+
+def _render_example_dataset_downloads() -> None:
+    """Render downloadable bundled example container CSVs."""
+    st.sidebar.subheader("Example datasets")
+    try:
+        datasets = helpers.example_dataset_catalog()
+    except OSError as exc:
+        st.sidebar.warning(f"Example datasets are unavailable: {exc}")
+        return
+
+    for dataset in datasets:
+        st.sidebar.caption(f"{dataset.size} containers - {dataset.description}")
+        st.sidebar.download_button(
+            f"Download {dataset.size} containers",
+            data=dataset.csv_text,
+            file_name=dataset.file_name,
+            mime="text/csv",
+            key=f"download_dataset_{dataset.size}",
+            use_container_width=True,
+        )
+
+
 def render_sidebar() -> SidebarConfig:
     """Render every input control and return the collected configuration."""
     st.sidebar.header("Scenario configuration")
+    _render_scenario_importer()
+    _ensure_sidebar_defaults()
 
     st.sidebar.subheader("Vessel dimensions")
-    bays = st.sidebar.number_input("Bays", min_value=1, max_value=50, value=DEFAULT_BAYS, step=1)
-    rows = st.sidebar.number_input("Rows", min_value=1, max_value=50, value=DEFAULT_ROWS, step=1)
-    tiers = st.sidebar.number_input("Tiers", min_value=1, max_value=50, value=DEFAULT_TIERS, step=1)
+    bays = st.sidebar.number_input(
+        "Bays",
+        min_value=1,
+        max_value=50,
+        step=1,
+        key="scenario_bays",
+    )
+    rows = st.sidebar.number_input(
+        "Rows",
+        min_value=1,
+        max_value=50,
+        step=1,
+        key="scenario_rows",
+    )
+    tiers = st.sidebar.number_input(
+        "Tiers",
+        min_value=1,
+        max_value=50,
+        step=1,
+        key="scenario_tiers",
+    )
 
     st.sidebar.subheader("Reefer-capable slots")
     reefer_text = st.sidebar.text_area(
         "Positions as `(bay, row, tier)`",
-        value=DEFAULT_REEFER_TEXT,
         help="One slot per line (or separated by `;`). Leave empty for no reefer slots.",
         height=110,
+        key="scenario_reefer_text",
     )
 
     st.sidebar.subheader("Route (port sequence)")
     route_text = st.sidebar.text_area(
         "Ports in unloading order",
-        value=DEFAULT_ROUTE_TEXT,
         help="Separate ports with commas or new lines. Order matters for rehandling.",
         height=80,
+        key="scenario_route_text",
     )
 
     st.sidebar.subheader("Containers")
+    has_imported_containers = st.session_state.get("imported_container_csv_text") is not None
+    if has_imported_containers:
+        st.sidebar.markdown(f"**{IMPORTED_SCENARIO_SOURCE}**")
+        _render_imported_container_notice()
+
+    container_upload_help = (
+        "Columns: id, weight, destination_port, type. "
+        "If omitted, the imported scenario containers remain active."
+        if has_imported_containers
+        else "Columns: id, weight, destination_port, type. "
+        "If omitted, a built-in example is used."
+    )
     uploaded = st.sidebar.file_uploader(
-        "Upload container CSV",
+        "Replace containers with CSV" if has_imported_containers else "Upload container CSV",
         type=["csv"],
-        help="Columns: id, weight, destination_port, type. "
-        "If omitted, a built-in example is used.",
+        help=container_upload_help,
+        key=f"container_csv_upload_{st.session_state.get('container_upload_nonce', 0)}",
     )
     uploaded_csv_text: str | None = None
     uploaded_csv_error: str | None = None
     uploaded_name: str | None = None
     if uploaded is not None:
+        if has_imported_containers:
+            _clear_imported_containers()
         decoded = helpers.decode_csv_upload(uploaded.getvalue())
         uploaded_csv_text = decoded.text
         uploaded_csv_error = decoded.error
         uploaded_name = uploaded.name
+    elif st.session_state.get("imported_container_csv_text") is not None:
+        uploaded_csv_text = st.session_state["imported_container_csv_text"]
+        uploaded_name = st.session_state.get("imported_container_source", "Imported scenario")
     st.sidebar.download_button(
         "Download CSV template",
         data=CSV_TEMPLATE,
@@ -139,32 +387,64 @@ def render_sidebar() -> SidebarConfig:
     algorithms = st.sidebar.multiselect(
         "Run one or more",
         options=list(helpers.ALGORITHMS),
-        default=["Greedy"],
         help="Selecting several runs them all and shows a comparison table.",
+        key="scenario_algorithms",
     )
 
     st.sidebar.subheader("Center-of-gravity tolerances")
     cg_tolerance_lon = st.sidebar.slider(
-        "Longitudinal tolerance (τ_lon)", 0.0, 1.0, value=DEFAULT_CG_TOLERANCE_LON, step=0.05
+        "Longitudinal tolerance (tau_lon)",
+        0.0,
+        1.0,
+        step=0.05,
+        key="scenario_cg_tolerance_lon",
     )
     cg_tolerance_lat = st.sidebar.slider(
-        "Lateral tolerance (τ_lat)", 0.0, 1.0, value=DEFAULT_CG_TOLERANCE_LAT, step=0.05
+        "Lateral tolerance (tau_lat)",
+        0.0,
+        1.0,
+        step=0.05,
+        key="scenario_cg_tolerance_lat",
     )
 
     st.sidebar.subheader("Objective weights")
-    cg_lon = st.sidebar.number_input("Longitudinal CG weight", 0.0, 100.0, value=1.0, step=0.5)
-    cg_lat = st.sidebar.number_input("Lateral CG weight", 0.0, 100.0, value=1.0, step=0.5)
-    vertical = st.sidebar.number_input("Vertical CG weight", 0.0, 100.0, value=1.0, step=0.5)
-    rehandling = st.sidebar.number_input("Rehandling weight", 0.0, 100.0, value=1.0, step=0.5)
+    cg_lon = st.sidebar.number_input(
+        "Longitudinal CG weight",
+        0.0,
+        100.0,
+        step=0.5,
+        key="scenario_weight_cg_lon",
+    )
+    cg_lat = st.sidebar.number_input(
+        "Lateral CG weight",
+        0.0,
+        100.0,
+        step=0.5,
+        key="scenario_weight_cg_lat",
+    )
+    vertical = st.sidebar.number_input(
+        "Vertical CG weight",
+        0.0,
+        100.0,
+        step=0.5,
+        key="scenario_weight_vertical",
+    )
+    rehandling = st.sidebar.number_input(
+        "Rehandling weight",
+        0.0,
+        100.0,
+        step=0.5,
+        key="scenario_weight_rehandling",
+    )
 
     with st.sidebar.expander("Advanced constraints"):
         min_distance = st.number_input(
             "Min. incompatible-cargo bay distance",
             min_value=0,
             max_value=50,
-            value=DEFAULT_MIN_INCOMPATIBLE_BAY_DISTANCE,
             step=1,
             help="Minimum bay separation between Flammable and Oxidizer cargo.",
+            key="scenario_min_incompatible_distance",
         )
 
     milp_time_limit: float | None = None
@@ -174,8 +454,8 @@ def render_sidebar() -> SidebarConfig:
                 "Time limit (seconds, 0 = no limit)",
                 min_value=0.0,
                 max_value=3600.0,
-                value=10.0,
                 step=1.0,
+                key="scenario_milp_time_limit_seconds",
             )
             milp_time_limit = limit if limit > 0 else None
 
@@ -186,18 +466,44 @@ def render_sidebar() -> SidebarConfig:
     ga_seed: int | None = 42
     if "Genetic Algorithm" in algorithms:
         with st.sidebar.expander("Genetic algorithm settings", expanded=True):
-            preset = st.selectbox(
-                "Search preset", options=list(helpers.GA_PRESETS), index=1
+            ga_population = st.number_input(
+                "Population size",
+                min_value=2,
+                max_value=500,
+                step=1,
+                key="scenario_ga_population_size",
             )
-            ga_population = helpers.GA_PRESETS[preset]["population_size"]
-            ga_generations = helpers.GA_PRESETS[preset]["max_generations"]
-            st.caption(
-                f"Population {ga_population}, up to {ga_generations} generations."
+            ga_generations = st.number_input(
+                "Max generations",
+                min_value=1,
+                max_value=5000,
+                step=1,
+                key="scenario_ga_max_generations",
             )
-            ga_mutation = st.slider("Mutation probability", 0.0, 1.0, value=0.05, step=0.01)
-            ga_crossover = st.slider("Crossover probability", 0.0, 1.0, value=0.80, step=0.05)
-            use_seed = st.checkbox("Use fixed random seed (reproducible)", value=True)
-            seed_value = st.number_input("Random seed", min_value=0, value=42, step=1)
+            ga_mutation = st.slider(
+                "Mutation probability",
+                0.0,
+                1.0,
+                step=0.01,
+                key="scenario_ga_mutation_probability",
+            )
+            ga_crossover = st.slider(
+                "Crossover probability",
+                0.0,
+                1.0,
+                step=0.05,
+                key="scenario_ga_crossover_probability",
+            )
+            use_seed = st.checkbox(
+                "Use fixed random seed (reproducible)",
+                key="scenario_ga_use_seed",
+            )
+            seed_value = st.number_input(
+                "Random seed",
+                min_value=0,
+                step=1,
+                key="scenario_ga_random_seed",
+            )
             ga_seed = int(seed_value) if use_seed else None
 
     params = helpers.SolverParams(
@@ -216,7 +522,12 @@ def render_sidebar() -> SidebarConfig:
         ga_random_seed=ga_seed,
     )
 
-    run = st.sidebar.button("Run optimization", type="primary", use_container_width=True)
+    run = st.sidebar.button(
+        "Run optimization",
+        type="primary",
+        use_container_width=True,
+        key="scenario_run_optimization",
+    )
 
     return SidebarConfig(
         bays=int(bays),
@@ -260,7 +571,10 @@ def build_scenario(config: SidebarConfig) -> tuple[ProblemInstance | None, list[
         parsed = helpers.parse_containers_csv(config.uploaded_csv_text)
         errors.extend(parsed.errors)
         containers = parsed.containers
-        container_source = f"Uploaded file: {config.uploaded_name}"
+        if config.uploaded_name == IMPORTED_SCENARIO_SOURCE:
+            container_source = config.uploaded_name
+        else:
+            container_source = f"Uploaded file: {config.uploaded_name}"
     else:
         containers = create_small_example_instance().containers
         container_source = "Built-in example (no file uploaded)"
@@ -412,10 +726,19 @@ def render_result_detail(
         st.warning(message)
 
     render_kpis(result)
+    download_key_prefix = _streamlit_key("download", entry["algorithm"])
+    file_prefix = _streamlit_key(entry["algorithm"]).strip("_")
 
     st.markdown("**Common metrics**")
     metrics_df = pd.DataFrame(helpers.metrics_table_rows(result.metrics.as_dict()))
     st.dataframe(metrics_df, use_container_width=True, hide_index=True)
+    st.download_button(
+        "Download metrics CSV",
+        data=helpers.metrics_csv(result.metrics.as_dict()),
+        file_name=f"{file_prefix}_metrics.csv",
+        mime="text/csv",
+        key=f"{download_key_prefix}_metrics_csv",
+    )
 
     st.markdown("**Final stowage plan**")
     rows = helpers.assignment_rows(instance, result.solution)
@@ -423,6 +746,13 @@ def render_result_detail(
         st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
     else:
         st.info("No containers were assigned, so the stowage plan is empty.")
+    st.download_button(
+        "Download final stowage plan CSV",
+        data=helpers.stowage_plan_csv(instance, result.solution),
+        file_name=f"{file_prefix}_stowage_plan.csv",
+        mime="text/csv",
+        key=f"{download_key_prefix}_plan_csv",
+    )
 
     render_visualization_section(entry["algorithm"], instance, result, params)
 
@@ -586,10 +916,18 @@ def render_results() -> None:
     successful = [entry for entry in results if entry["result"] is not None]
     if len(successful) > 1:
         st.subheader("Algorithm comparison")
-        comparison = pd.DataFrame(
+        comparison_rows = [
             helpers.comparison_row(entry["algorithm"], entry["result"]) for entry in successful
-        )
+        ]
+        comparison = pd.DataFrame(comparison_rows)
         st.dataframe(comparison, use_container_width=True, hide_index=True)
+        st.download_button(
+            "Download algorithm comparison CSV",
+            data=helpers.comparison_csv(comparison_rows),
+            file_name="algorithm_comparison.csv",
+            mime="text/csv",
+            key="download_algorithm_comparison_csv",
+        )
         st.caption(
             "Comparison uses shared final metrics. Raw objective values are not "
             "comparable across algorithms with different internal proxies."
@@ -631,6 +969,8 @@ def main() -> None:
     )
 
     config = render_sidebar()
+    _render_current_scenario_download(config)
+    _render_example_dataset_downloads()
     if config.run:
         execute_run(config)
 

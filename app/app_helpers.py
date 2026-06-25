@@ -18,11 +18,15 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 import math
 import re
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 
-from stowage_optimizer.core import Container, ProblemInstance, StowageSolution
+from stowage_optimizer.core import Container, ProblemInstance, Route, Ship, StowageSolution
+from stowage_optimizer.core.validation import validate_instance
 from stowage_optimizer.core.metrics import (
     DEFAULT_CG_TOLERANCE_LAT,
     DEFAULT_CG_TOLERANCE_LON,
@@ -41,6 +45,42 @@ from stowage_optimizer.solvers import (
 )
 
 REQUIRED_CONTAINER_COLUMNS: tuple[str, ...] = ("id", "weight", "destination_port", "type")
+SCENARIO_SCHEMA_VERSION = 1
+
+PLAN_CSV_COLUMNS: tuple[str, ...] = (
+    "container_id",
+    "bay",
+    "row",
+    "tier",
+    "weight",
+    "destination_port",
+    "type",
+)
+METRICS_CSV_COLUMNS: tuple[str, ...] = ("metric", "value")
+COMPARISON_CSV_COLUMNS: tuple[str, ...] = (
+    "algorithm",
+    "status",
+    "structural_feasible",
+    "cg_ok",
+    "operational_feasible",
+    "runtime_s",
+    "utilization",
+    "cg_x",
+    "cg_y",
+    "cg_z_norm",
+    "real_rehandling",
+    "violations",
+    "objective",
+)
+
+EXAMPLE_DATASET_SIZES: tuple[int, ...] = (20, 40, 60, 80)
+EXAMPLE_DATASET_DIR = Path(__file__).resolve().parent.parent / "data" / "examples"
+EXAMPLE_DATASET_DESCRIPTIONS: dict[int, str] = {
+    20: "Small mixed-cargo dataset for quick interactive runs.",
+    40: "Moderate mixed-cargo dataset for comparing solver behavior.",
+    60: "Larger UI dataset for Greedy or Genetic Algorithm experiments.",
+    80: "Largest bundled dataset for medium-scale stress testing.",
+}
 
 # A leading UTF-8 byte-order mark can survive into the first CSV header name.
 _BOM = chr(0xFEFF)
@@ -144,6 +184,16 @@ class RouteParseResult:
     @property
     def ok(self) -> bool:
         return not self.errors
+
+
+@dataclass(frozen=True)
+class ExampleDataset:
+    """Bundled example CSV exposed by the Streamlit app."""
+
+    size: int
+    file_name: str
+    description: str
+    csv_text: str
 
 
 def decode_csv_upload(data: bytes) -> CsvDecodeResult:
@@ -345,6 +395,253 @@ class SolverParams:
     ga_random_seed: int | None = 42
 
 
+@dataclass(frozen=True)
+class ScenarioImportResult:
+    """Validated scenario import outcome."""
+
+    instance: ProblemInstance | None
+    params: SolverParams
+    algorithms: tuple[str, ...]
+    errors: tuple[str, ...]
+    warnings: tuple[str, ...] = ()
+
+    @property
+    def ok(self) -> bool:
+        """Return whether the scenario is ready to load into the app."""
+        return self.instance is not None and not self.errors
+
+
+# --------------------------------------------------------------------------- #
+# Scenario import/export                                                       #
+# --------------------------------------------------------------------------- #
+
+
+def scenario_to_dict(
+    instance: ProblemInstance,
+    params: SolverParams,
+    algorithms: tuple[str, ...] = ("Greedy",),
+) -> dict[str, Any]:
+    """Return the complete, versioned JSON-ready scenario payload."""
+    selected_algorithms = tuple(algorithms) or ("Greedy",)
+    return {
+        "schema_version": SCENARIO_SCHEMA_VERSION,
+        "vessel": {
+            "bays": instance.ship.bays,
+            "rows": instance.ship.rows,
+            "tiers": instance.ship.tiers,
+        },
+        "route": list(instance.route.ports),
+        "containers": [
+            {
+                "id": container.id,
+                "weight": container.weight,
+                "destination_port": container.destination_port,
+                "type": str(container.type),
+            }
+            for container in instance.containers
+        ],
+        "reefer": {
+            "slots": [
+                {"bay": bay, "row": row, "tier": tier}
+                for bay, row, tier in sorted(instance.ship.reefer_slots)
+            ],
+        },
+        "cg_tolerances": {
+            "longitudinal": params.cg_tolerance_lon,
+            "lateral": params.cg_tolerance_lat,
+        },
+        "objective_weights": {
+            "cg_lon": params.cg_lon,
+            "cg_lat": params.cg_lat,
+            "vertical": params.vertical,
+            "rehandling": params.rehandling,
+        },
+        "solver_settings": {
+            "selected_algorithms": list(selected_algorithms),
+            "min_incompatible_bay_distance": params.min_incompatible_bay_distance,
+            "milp_time_limit_seconds": params.milp_time_limit_seconds,
+            "ga_population_size": params.ga_population_size,
+            "ga_max_generations": params.ga_max_generations,
+            "ga_mutation_probability": params.ga_mutation_probability,
+            "ga_crossover_probability": params.ga_crossover_probability,
+            "ga_random_seed": params.ga_random_seed,
+        },
+    }
+
+
+def scenario_to_json(
+    instance: ProblemInstance,
+    params: SolverParams,
+    algorithms: tuple[str, ...] = ("Greedy",),
+) -> str:
+    """Serialize a complete scenario to deterministic, readable JSON."""
+    return json.dumps(
+        scenario_to_dict(instance, params, algorithms),
+        indent=2,
+    ) + "\n"
+
+
+def import_scenario_json(text: str) -> ScenarioImportResult:
+    """Parse, build, and validate a scenario JSON payload.
+
+    Invalid scenarios return user-facing errors and no instance. The caller can
+    safely avoid updating UI state or running solvers unless ``result.ok`` is
+    true.
+    """
+    default_params = SolverParams()
+    default_algorithms = ("Greedy",)
+
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError as exc:
+        return ScenarioImportResult(
+            instance=None,
+            params=default_params,
+            algorithms=default_algorithms,
+            errors=(
+                "Invalid scenario JSON: "
+                f"{exc.msg} at line {exc.lineno}, column {exc.colno}.",
+            ),
+        )
+
+    if not isinstance(payload, dict):
+        return ScenarioImportResult(
+            instance=None,
+            params=default_params,
+            algorithms=default_algorithms,
+            errors=("Scenario JSON must contain an object at the top level.",),
+        )
+
+    errors: list[str] = []
+    version = payload.get("schema_version")
+    if version != SCENARIO_SCHEMA_VERSION:
+        errors.append(
+            "Unsupported scenario schema_version "
+            f"{version!r}; expected {SCENARIO_SCHEMA_VERSION}."
+        )
+
+    params, param_errors = _solver_params_from_payload(payload)
+    algorithms, algorithm_errors = _algorithms_from_payload(payload)
+    errors.extend(param_errors)
+    errors.extend(algorithm_errors)
+
+    vessel_data = _required_mapping(payload, "vessel", errors)
+    route_data = _required_sequence(payload, "route", errors)
+    container_data = _required_sequence(payload, "containers", errors)
+    reefer_data = _required_mapping(payload, "reefer", errors)
+
+    if errors:
+        return ScenarioImportResult(
+            instance=None,
+            params=params,
+            algorithms=algorithms,
+            errors=tuple(errors),
+        )
+
+    assert vessel_data is not None
+    assert route_data is not None
+    assert container_data is not None
+    assert reefer_data is not None
+
+    try:
+        reefer_slots = _reefer_slots_from_payload(reefer_data)
+        ship = Ship(
+            bays=_int_field(vessel_data, "bays", "vessel.bays"),
+            rows=_int_field(vessel_data, "rows", "vessel.rows"),
+            tiers=_int_field(vessel_data, "tiers", "vessel.tiers"),
+            reefer_slots=reefer_slots,
+        )
+        route = Route(_route_ports_from_payload(route_data))
+        containers = _containers_from_payload(container_data)
+        instance = ProblemInstance(ship=ship, containers=containers, route=route)
+    except ValueError as exc:
+        return ScenarioImportResult(
+            instance=None,
+            params=params,
+            algorithms=algorithms,
+            errors=(f"Scenario is invalid: {exc}",),
+        )
+
+    validation = validate_instance(instance)
+    if not validation.is_valid:
+        return ScenarioImportResult(
+            instance=None,
+            params=params,
+            algorithms=algorithms,
+            errors=tuple(issue.message for issue in validation.errors),
+            warnings=tuple(issue.message for issue in validation.warnings),
+        )
+
+    return ScenarioImportResult(
+        instance=instance,
+        params=params,
+        algorithms=algorithms,
+        errors=(),
+        warnings=tuple(issue.message for issue in validation.warnings),
+    )
+
+
+def scenario_reefer_text(instance: ProblemInstance) -> str:
+    """Format an instance's reefer slots for the Streamlit text area."""
+    return "\n".join(
+        f"({bay}, {row}, {tier})" for bay, row, tier in sorted(instance.ship.reefer_slots)
+    )
+
+
+def containers_to_csv_text(containers: tuple[Container, ...]) -> str:
+    """Serialize containers using the stable input CSV schema."""
+    rows = [
+        {
+            "id": container.id,
+            "weight": container.weight,
+            "destination_port": container.destination_port,
+            "type": str(container.type),
+        }
+        for container in containers
+    ]
+    return _rows_to_csv(rows, REQUIRED_CONTAINER_COLUMNS)
+
+
+# --------------------------------------------------------------------------- #
+# CSV exports and bundled datasets                                             #
+# --------------------------------------------------------------------------- #
+
+
+def stowage_plan_csv(instance: ProblemInstance, solution: StowageSolution) -> str:
+    """Serialize the final stowage plan with stable column names."""
+    return _rows_to_csv(assignment_rows(instance, solution), PLAN_CSV_COLUMNS)
+
+
+def metrics_csv(metrics_dict: dict[str, object]) -> str:
+    """Serialize final metrics as stable ``metric,value`` rows."""
+    rows = [
+        {"metric": metric, "value": value}
+        for metric, value in metrics_dict.items()
+    ]
+    return _rows_to_csv(rows, METRICS_CSV_COLUMNS)
+
+
+def comparison_csv(rows: list[dict[str, object]]) -> str:
+    """Serialize algorithm comparison rows with stable column names."""
+    return _rows_to_csv(rows, COMPARISON_CSV_COLUMNS)
+
+
+def example_dataset_catalog() -> tuple[ExampleDataset, ...]:
+    """Return the bundled downloadable example container datasets."""
+    datasets: list[ExampleDataset] = []
+    for size in EXAMPLE_DATASET_SIZES:
+        path = EXAMPLE_DATASET_DIR / f"containers_{size}.csv"
+        datasets.append(
+            ExampleDataset(
+                size=size,
+                file_name=path.name,
+                description=EXAMPLE_DATASET_DESCRIPTIONS[size],
+                csv_text=path.read_text(encoding="utf-8-sig"),
+            )
+        )
+    return tuple(datasets)
+
+
 def build_solver(algorithm: str, params: SolverParams) -> Solver:
     """Construct a configured solver for ``algorithm``.
 
@@ -538,3 +835,316 @@ def is_uncertified_milp_incumbent(algorithm_label: str, result: SolverResult) ->
         and "incumbent" in detail
         and "not certified" in detail
     )
+
+
+def _rows_to_csv(rows: list[dict[str, object]], columns: tuple[str, ...]) -> str:
+    output = io.StringIO()
+    writer = csv.DictWriter(
+        output,
+        fieldnames=columns,
+        extrasaction="ignore",
+        lineterminator="\n",
+    )
+    writer.writeheader()
+    writer.writerows(rows)
+    return output.getvalue()
+
+
+def _required_mapping(
+    payload: dict[str, Any], key: str, errors: list[str]
+) -> dict[str, Any] | None:
+    value = payload.get(key)
+    if not isinstance(value, dict):
+        errors.append(f"Scenario field `{key}` must be an object.")
+        return None
+    return value
+
+
+def _required_sequence(
+    payload: dict[str, Any], key: str, errors: list[str]
+) -> list[Any] | None:
+    value = payload.get(key)
+    if not isinstance(value, list):
+        errors.append(f"Scenario field `{key}` must be a list.")
+        return None
+    return value
+
+
+def _solver_params_from_payload(payload: dict[str, Any]) -> tuple[SolverParams, tuple[str, ...]]:
+    errors: list[str] = []
+    tolerances = _required_mapping(payload, "cg_tolerances", errors) or {}
+    weights = _required_mapping(payload, "objective_weights", errors) or {}
+    settings = _required_mapping(payload, "solver_settings", errors) or {}
+
+    min_distance = _int_payload_field(
+        settings,
+        "min_incompatible_bay_distance",
+        "solver_settings.min_incompatible_bay_distance",
+        errors,
+        default=DEFAULT_MIN_INCOMPATIBLE_BAY_DISTANCE,
+    )
+    ga_population = _int_payload_field(
+        settings,
+        "ga_population_size",
+        "solver_settings.ga_population_size",
+        errors,
+        default=50,
+    )
+    ga_generations = _int_payload_field(
+        settings,
+        "ga_max_generations",
+        "solver_settings.ga_max_generations",
+        errors,
+        default=100,
+    )
+    ga_seed = _optional_int_payload_field(
+        settings,
+        "ga_random_seed",
+        "solver_settings.ga_random_seed",
+        errors,
+        default=42,
+    )
+    milp_time_limit = _optional_float_payload_field(
+        settings,
+        "milp_time_limit_seconds",
+        "solver_settings.milp_time_limit_seconds",
+        errors,
+        default=None,
+    )
+    ga_mutation = _float_payload_field(
+        settings,
+        "ga_mutation_probability",
+        "solver_settings.ga_mutation_probability",
+        errors,
+        default=0.05,
+    )
+    ga_crossover = _float_payload_field(
+        settings,
+        "ga_crossover_probability",
+        "solver_settings.ga_crossover_probability",
+        errors,
+        default=0.80,
+    )
+
+    if min_distance < 0:
+        errors.append("solver_settings.min_incompatible_bay_distance must be non-negative.")
+    if ga_population <= 0:
+        errors.append("solver_settings.ga_population_size must be positive.")
+    if ga_generations <= 0:
+        errors.append("solver_settings.ga_max_generations must be positive.")
+    if milp_time_limit is not None and milp_time_limit < 0:
+        errors.append("solver_settings.milp_time_limit_seconds must be non-negative or null.")
+    if not 0.0 <= ga_mutation <= 1.0:
+        errors.append("solver_settings.ga_mutation_probability must be between 0 and 1.")
+    if not 0.0 <= ga_crossover <= 1.0:
+        errors.append("solver_settings.ga_crossover_probability must be between 0 and 1.")
+
+    params = SolverParams(
+        cg_lon=_float_payload_field(
+            weights, "cg_lon", "objective_weights.cg_lon", errors, default=1.0
+        ),
+        cg_lat=_float_payload_field(
+            weights, "cg_lat", "objective_weights.cg_lat", errors, default=1.0
+        ),
+        vertical=_float_payload_field(
+            weights, "vertical", "objective_weights.vertical", errors, default=1.0
+        ),
+        rehandling=_float_payload_field(
+            weights, "rehandling", "objective_weights.rehandling", errors, default=1.0
+        ),
+        cg_tolerance_lon=_float_payload_field(
+            tolerances,
+            "longitudinal",
+            "cg_tolerances.longitudinal",
+            errors,
+            default=DEFAULT_CG_TOLERANCE_LON,
+        ),
+        cg_tolerance_lat=_float_payload_field(
+            tolerances,
+            "lateral",
+            "cg_tolerances.lateral",
+            errors,
+            default=DEFAULT_CG_TOLERANCE_LAT,
+        ),
+        min_incompatible_bay_distance=min_distance,
+        milp_time_limit_seconds=milp_time_limit,
+        ga_population_size=ga_population,
+        ga_max_generations=ga_generations,
+        ga_mutation_probability=ga_mutation,
+        ga_crossover_probability=ga_crossover,
+        ga_random_seed=ga_seed,
+    )
+    return params, tuple(errors)
+
+
+def _algorithms_from_payload(payload: dict[str, Any]) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    errors: list[str] = []
+    settings = payload.get("solver_settings")
+    if not isinstance(settings, dict):
+        return ("Greedy",), ()
+
+    raw_algorithms = settings.get("selected_algorithms")
+    if not isinstance(raw_algorithms, list) or not raw_algorithms:
+        return ("Greedy",), ("solver_settings.selected_algorithms must be a non-empty list.",)
+
+    algorithms: list[str] = []
+    for index, raw_algorithm in enumerate(raw_algorithms, start=1):
+        if not isinstance(raw_algorithm, str):
+            errors.append(f"solver_settings.selected_algorithms[{index}] must be a string.")
+            continue
+        if raw_algorithm not in ALGORITHMS:
+            errors.append(
+                f"Unknown algorithm `{raw_algorithm}` in scenario. "
+                f"Expected one of: {', '.join(ALGORITHMS)}."
+            )
+            continue
+        algorithms.append(raw_algorithm)
+
+    return tuple(algorithms) or ("Greedy",), tuple(errors)
+
+
+def _float_payload_field(
+    mapping: dict[str, Any],
+    key: str,
+    label: str,
+    errors: list[str],
+    *,
+    default: float,
+) -> float:
+    if key not in mapping:
+        errors.append(f"Scenario field `{label}` is required.")
+        return default
+    value = mapping[key]
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        errors.append(f"Scenario field `{label}` must be a finite number.")
+        return default
+    return float(value)
+
+
+def _optional_float_payload_field(
+    mapping: dict[str, Any],
+    key: str,
+    label: str,
+    errors: list[str],
+    *,
+    default: float | None,
+) -> float | None:
+    if key not in mapping:
+        errors.append(f"Scenario field `{label}` is required.")
+        return default
+    value = mapping[key]
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        errors.append(f"Scenario field `{label}` must be a finite number or null.")
+        return default
+    return float(value)
+
+
+def _int_payload_field(
+    mapping: dict[str, Any],
+    key: str,
+    label: str,
+    errors: list[str],
+    *,
+    default: int,
+) -> int:
+    if key not in mapping:
+        errors.append(f"Scenario field `{label}` is required.")
+        return default
+    return _int_value(mapping[key], label, errors, default=default)
+
+
+def _optional_int_payload_field(
+    mapping: dict[str, Any],
+    key: str,
+    label: str,
+    errors: list[str],
+    *,
+    default: int | None,
+) -> int | None:
+    if key not in mapping:
+        errors.append(f"Scenario field `{label}` is required.")
+        return default
+    value = mapping[key]
+    if value is None:
+        return None
+    return _int_value(value, label, errors, default=default if default is not None else 0)
+
+
+def _int_value(value: Any, label: str, errors: list[str], *, default: int) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        errors.append(f"Scenario field `{label}` must be an integer.")
+        return default
+    return value
+
+
+def _reefer_slots_from_payload(reefer_data: dict[str, Any]) -> tuple[tuple[int, int, int], ...]:
+    raw_slots = reefer_data.get("slots")
+    if not isinstance(raw_slots, list):
+        raise ValueError("reefer.slots must be a list.")
+
+    slots: list[tuple[int, int, int]] = []
+    for index, raw_slot in enumerate(raw_slots, start=1):
+        label = f"reefer.slots[{index}]"
+        if isinstance(raw_slot, dict):
+            slot = (
+                _int_field(raw_slot, "bay", f"{label}.bay"),
+                _int_field(raw_slot, "row", f"{label}.row"),
+                _int_field(raw_slot, "tier", f"{label}.tier"),
+            )
+        elif isinstance(raw_slot, list) and len(raw_slot) == 3:
+            slot = (
+                _json_int(raw_slot[0], f"{label}[0]"),
+                _json_int(raw_slot[1], f"{label}[1]"),
+                _json_int(raw_slot[2], f"{label}[2]"),
+            )
+        else:
+            raise ValueError(f"{label} must be an object or [bay, row, tier] list.")
+
+        if slot not in slots:
+            slots.append(slot)
+
+    return tuple(slots)
+
+
+def _route_ports_from_payload(route_data: list[Any]) -> tuple[str, ...]:
+    ports: list[str] = []
+    for index, raw_port in enumerate(route_data, start=1):
+        if not isinstance(raw_port, str):
+            raise ValueError(f"route[{index}] must be a string.")
+        ports.append(raw_port)
+    return tuple(ports)
+
+
+def _containers_from_payload(container_data: list[Any]) -> tuple[Container, ...]:
+    containers: list[Container] = []
+    required = set(REQUIRED_CONTAINER_COLUMNS)
+    for index, raw_container in enumerate(container_data, start=1):
+        label = f"containers[{index}]"
+        if not isinstance(raw_container, dict):
+            raise ValueError(f"{label} must be an object.")
+        missing = sorted(required - raw_container.keys())
+        if missing:
+            raise ValueError(f"{label} is missing required field(s): {', '.join(missing)}.")
+        containers.append(
+            Container(
+                id=raw_container["id"],
+                weight=raw_container["weight"],
+                destination_port=raw_container["destination_port"],
+                type=raw_container["type"],
+            )
+        )
+    return tuple(containers)
+
+
+def _int_field(mapping: dict[str, Any], key: str, label: str) -> int:
+    if key not in mapping:
+        raise ValueError(f"{label} is required.")
+    return _json_int(mapping[key], label)
+
+
+def _json_int(value: Any, label: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{label} must be an integer.")
+    return value

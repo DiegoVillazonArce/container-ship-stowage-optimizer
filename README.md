@@ -1,12 +1,12 @@
 # Container Ship Stowage Optimizer
 
-**Status:** Phases 1 through 10 completed. Phases 11 through 14 are planned roadmap extensions covering scenario/result export, visual diagnostics, local search, and an academic explanation layer. Core domain models, validation, a small example instance, the common metrics engine, the greedy baseline solver, the exact MILP reference solver with incumbent recovery, the genetic algorithm solver, the Streamlit interface, Plotly 3D visualization, port-by-port unloading simulation, reproducible benchmark scenarios, benchmark runner helpers, project quality tooling, CI, coverage reporting, deployment readiness, and final academic documentation are implemented. The core package, solvers, benchmark helpers, Streamlit-independent app helpers, and visualization helpers are unit-tested.
+**Status:** Phases 1 through 11 completed. Phases 12 through 14 are planned roadmap extensions covering visual diagnostics, local search, and an academic explanation layer. Core domain models, validation, a small example instance, the common metrics engine, the greedy baseline solver, the exact MILP reference solver with incumbent recovery, the genetic algorithm solver, the Streamlit interface, Plotly 3D visualization, port-by-port unloading simulation, reproducible benchmark scenarios, benchmark runner helpers, project quality tooling, CI, coverage reporting, deployment readiness, scenario/result import and export, bundled downloadable datasets, and final academic documentation are implemented. The core package, solvers, benchmark helpers, Streamlit-independent app helpers, and visualization helpers are unit-tested.
 
 **Live app:** [container-ship-stowage-optimizer.streamlit.app](https://container-ship-stowage-optimizer.streamlit.app/)
 
 ## Current Repository State
 
-This repository contains the project planning documentation plus the completed implementation increments. The current Python package includes vessel slots and normalized coordinates, container and route models, problem instances, pre-solver validation, a small hand-checkable example, a common metrics engine (weight, utilization, center-of-gravity moments, side and end balance, constraint-violation counts, and real rehandling by simulated unloading), a common solver interface, the greedy baseline solver with optional swap-based repair, the MILP exact reference solver (PuLP/CBC) enforcing the hard constraints, minimizing the linear objective, and recovering feasible non-certified incumbents, the genetic algorithm metaheuristic solver, the Streamlit interface with Plotly 3D visualization and unloading simulation, reproducible benchmark scenarios, benchmark table exporters, and automated tests.
+This repository contains the project planning documentation plus the completed implementation increments. The current Python package includes vessel slots and normalized coordinates, container and route models, problem instances, pre-solver validation, a small hand-checkable example, a common metrics engine (weight, utilization, center-of-gravity moments, side and end balance, constraint-violation counts, and real rehandling by simulated unloading), a common solver interface, the greedy baseline solver with optional swap-based repair, the MILP exact reference solver (PuLP/CBC) enforcing the hard constraints, minimizing the linear objective, and recovering feasible non-certified incumbents, the genetic algorithm metaheuristic solver, the Streamlit interface with Plotly 3D visualization, unloading simulation, scenario JSON import/export, CSV result downloads, bundled example dataset downloads, reproducible benchmark scenarios, benchmark table exporters, and automated tests.
 
 The detailed implementation plan is maintained in [ROADMAP.md](./ROADMAP.md). The roadmap is the source of truth for phase boundaries. Technical model details are documented in [docs/DESIGN.md](./docs/DESIGN.md), and benchmark reproduction notes are documented in [docs/BENCHMARKS.md](./docs/BENCHMARKS.md).
 
@@ -422,7 +422,7 @@ Current roadmap status:
 | Phase 8 | Testing, Benchmarking, and Documentation | Completed |
 | Phase 9 | Project Quality, Reproducibility & Deployment | Completed |
 | Phase 10 | MILP Incumbent Recovery | Completed |
-| Phase 11 | Scenario & Result Export/Import | Planned |
+| Phase 11 | Scenario & Result Export/Import | Completed |
 | Phase 12 | Visual Diagnostics | Planned |
 | Phase 13 | Local Search after Greedy/GA | Planned |
 | Phase 14 | Academic Explanation & Learning Mode | Planned |
@@ -694,10 +694,13 @@ powershell -ExecutionPolicy Bypass -File .\run_app.ps1
 
 The interface lets you configure the vessel grid, reefer slots, route,
 and objective weights, upload a container CSV (columns `id`, `weight`,
-`destination_port`, `type`) or use the built-in example, run the Greedy, MILP,
-and Genetic solvers, and inspect KPIs, the final stowage plan, a Plotly 3D
-stowage view, port-by-port unloading simulation, and an algorithm comparison
-table. Validation errors are reported before any solver runs.
+`destination_port`, `type`) or use the built-in example, import/export a
+complete scenario as JSON, run the Greedy, MILP, and Genetic solvers, and
+inspect KPIs, the final stowage plan, a Plotly 3D stowage view, port-by-port
+unloading simulation, and an algorithm comparison table. The final plan,
+metrics, and algorithm comparison can be downloaded as CSV. Bundled example
+datasets for 20, 40, 60, and 80 containers can be downloaded directly from
+the Streamlit sidebar. Validation errors are reported before any solver runs.
 
 The CSV `type` column accepts `Normal`, `Reefer`, `Flammable`, or `Oxidizer`.
 
@@ -786,10 +789,9 @@ Safe optimizations that preserve the current model:
 - caching repeated GA fitness and metrics computations;
 - faster stack indexing for real rehandling simulation.
 
-Near-term product, presentation, and reproducibility work is tracked in
-ROADMAP phases 9-14, including hosted Streamlit deployment readiness, scenario
-and result exports, downloadable example datasets, richer visual diagnostics,
-local search post-processing, and an academic explanation tab.
+Remaining product and presentation work is tracked in ROADMAP phases 12-14,
+including richer visual diagnostics, local search post-processing, and an
+academic explanation tab.
 
 Higher-risk heuristic reductions should be documented separately because they
 can change the explored search space:

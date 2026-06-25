@@ -801,6 +801,16 @@ coverage-enabled pytest runs, GitHub Actions CI, PowerShell helper scripts, and
 Streamlit Community Cloud deployment notes. The public hosted app is available
 from the README.
 
+Phase 11 adds app-level experiment reproducibility. A complete Streamlit
+scenario can be serialized as versioned JSON with vessel dimensions, route,
+containers, reefer slot configuration, horizontal CG tolerances, objective
+weights, selected algorithms, and relevant solver settings. Imported scenarios
+are parsed and validated through the same core instance validation before they
+are loaded into the UI or used for optimization. Final stowage plans, metrics,
+and algorithm comparison tables are downloadable as CSV with stable column
+names. The app also exposes bundled 20-, 40-, 60-, and 80-container example
+datasets using the standard container CSV schema.
+
 Canonical scenarios:
 
 | Scenario | Purpose |
@@ -859,8 +869,6 @@ Possible extensions include:
 - Exact pairwise rehandling model for small instances.
 - More detailed stack weight and structural constraints.
 - Multiple dangerous cargo classes and richer separation rules.
-- Scenario export and import.
-- Downloadable benchmark or example datasets from the Streamlit interface.
 - Sensitivity analysis for objective weights.
 - More advanced visual diagnostics and academic explanation inside the app.
 - Local search improvement after Greedy or Genetic Algorithm outputs.
