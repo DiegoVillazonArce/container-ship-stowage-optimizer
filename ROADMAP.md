@@ -469,6 +469,13 @@ container datasets from the UI.
 
 Enrich the Streamlit diagnostics layer with structured visual explanations of balance, center of gravity, constraint violations, and algorithm differences.
 
+**Status:** Completed. The Streamlit results layer now shows a bay-row weight
+balance heatmap, a center-of-gravity diagnostic against the ideal point with a
+tolerance box, readable per-rule violation explanations, and a side-by-side
+diagnostics comparison across algorithms. The data preparation lives in
+testable `app/app_helpers.py` helpers and the figures in
+`stowage_optimizer.viz.diagnostics`.
+
 ### User Stories
 
 - As a developer, I want a bay-row balance map, so that weight distribution issues are visible at a glance.
@@ -478,13 +485,13 @@ Enrich the Streamlit diagnostics layer with structured visual explanations of ba
 
 ### Tasks
 
-- [ ] Build a bay-row balance map from structured result data.
-- [ ] Mark the computed center of gravity in the visual diagnostics.
-- [ ] Add readable explanations for reefer, stack continuity, incompatible cargo, and CG violations.
-- [ ] Link violation explanations to affected containers, slots, or aggregate metrics when available.
-- [ ] Add side-by-side comparison between algorithm results.
-- [ ] Reuse the structured scenario and result data from Phase 11.
-- [ ] Add tests for diagnostic data preparation helpers.
+- [x] Build a bay-row balance map from structured result data.
+- [x] Mark the computed center of gravity in the visual diagnostics.
+- [x] Add readable explanations for reefer, stack continuity, incompatible cargo, and CG violations.
+- [x] Link violation explanations to affected containers, slots, or aggregate metrics when available.
+- [x] Add side-by-side comparison between algorithm results.
+- [x] Reuse the structured scenario and result data from Phase 11.
+- [x] Add tests for diagnostic data preparation helpers.
 
 ### Definition of Done
 

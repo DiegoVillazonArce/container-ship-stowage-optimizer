@@ -42,7 +42,11 @@ from stowage_optimizer.core.metrics import (
     evaluate_solution,
     simulate_unloading_events,
 )
-from stowage_optimizer.viz import build_stowage_figure
+from stowage_optimizer.viz import (
+    build_bay_row_balance_figure,
+    build_cg_diagnostic_figure,
+    build_stowage_figure,
+)
 
 # Defaults match ``create_small_example_instance`` so the internal example runs
 # cleanly with the form's initial values and no uploaded file.
@@ -709,6 +713,7 @@ def render_result_detail(
     entry: dict,
     instance: ProblemInstance,
     params: helpers.SolverParams,
+    balance_weight_range: tuple[float, float] | None = None,
 ) -> None:
     if entry.get("skipped") is not None:
         st.warning(entry["skipped"])
@@ -754,7 +759,144 @@ def render_result_detail(
         key=f"{download_key_prefix}_plan_csv",
     )
 
+    render_diagnostics_section(
+        entry["algorithm"],
+        instance,
+        result,
+        params,
+        balance_weight_range,
+    )
     render_visualization_section(entry["algorithm"], instance, result, params)
+
+
+def render_diagnostics_section(
+    algorithm_label: str,
+    instance: ProblemInstance,
+    result,
+    params: helpers.SolverParams,
+    balance_weight_range: tuple[float, float] | None = None,
+) -> None:
+    """Render the Phase 12 visual diagnostics for a single solver result.
+
+    Combines a bay-row balance map, a center-of-gravity diagnostic against the
+    ideal point, and readable violation explanations derived from the shared
+    final metrics.
+    """
+    st.markdown("**Visual diagnostics**")
+
+    columns = st.columns(2)
+
+    balance_rows = helpers.bay_row_balance_rows(instance, result.solution)
+    balance_figure = build_bay_row_balance_figure(
+        instance,
+        balance_rows,
+        title=f"{algorithm_label}: bay-row weight balance",
+        weight_range=balance_weight_range,
+    )
+    columns[0].plotly_chart(balance_figure, use_container_width=True)
+
+    diagnostic = helpers.cg_diagnostic(result.metrics, params)
+    cg_figure = build_cg_diagnostic_figure(
+        diagnostic.cg_x,
+        diagnostic.cg_y,
+        diagnostic.tolerance_lon,
+        diagnostic.tolerance_lat,
+        title=f"{algorithm_label}: center of gravity vs. ideal",
+    )
+    columns[1].plotly_chart(cg_figure, use_container_width=True)
+    if diagnostic.within_tolerance:
+        columns[1].success(
+            f"CG within tolerance — x={diagnostic.cg_x:.3f}, y={diagnostic.cg_y:.3f} "
+            f"(tau_lon={diagnostic.tolerance_lon:.2f}, tau_lat={diagnostic.tolerance_lat:.2f})."
+        )
+    else:
+        columns[1].warning(
+            f"CG outside tolerance — x={diagnostic.cg_x:.3f}, y={diagnostic.cg_y:.3f} "
+            f"(tau_lon={diagnostic.tolerance_lon:.2f}, tau_lat={diagnostic.tolerance_lat:.2f})."
+        )
+
+    st.markdown("_Constraint diagnostics_")
+    for explanation in helpers.violation_explanations(result):
+        _render_violation_explanation(explanation)
+
+
+def _render_violation_explanation(explanation: helpers.ViolationExplanation) -> None:
+    """Render one violation explanation using a severity-appropriate callout."""
+    if explanation.severity == "ok":
+        st.success(explanation.message)
+        return
+    text = f"**{explanation.title}** ({explanation.count}): {explanation.message}"
+    if explanation.severity == "error":
+        st.error(text)
+    else:
+        st.warning(text)
+
+
+def render_diagnostics_comparison(
+    successful: list[dict],
+    instance: ProblemInstance,
+    params: helpers.SolverParams,
+    balance_weight_range: tuple[float, float],
+) -> None:
+    """Render a side-by-side visual diagnostics comparison across algorithms."""
+    st.subheader("Diagnostics comparison")
+
+    diagnostic_rows = [
+        helpers.algorithm_diagnostic_row(entry["algorithm"], entry["result"])
+        for entry in successful
+    ]
+    st.dataframe(
+        pd.DataFrame(diagnostic_rows),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    st.markdown("**Center of gravity by algorithm**")
+    cg_columns = st.columns(len(successful))
+    for column, entry in zip(cg_columns, successful):
+        diagnostic = helpers.cg_diagnostic(entry["result"].metrics, params)
+        column.plotly_chart(
+            build_cg_diagnostic_figure(
+                diagnostic.cg_x,
+                diagnostic.cg_y,
+                diagnostic.tolerance_lon,
+                diagnostic.tolerance_lat,
+                title=f"{entry['algorithm']} CG",
+            ),
+            use_container_width=True,
+        )
+
+    st.markdown("**Bay-row balance by algorithm**")
+    balance_row_sets = [
+        helpers.bay_row_balance_rows(instance, entry["result"].solution)
+        for entry in successful
+    ]
+    balance_columns = st.columns(len(successful))
+    for column, entry, balance_rows in zip(balance_columns, successful, balance_row_sets):
+        column.plotly_chart(
+            build_bay_row_balance_figure(
+                instance,
+                balance_rows,
+                title=f"{entry['algorithm']} balance",
+                weight_range=balance_weight_range,
+            ),
+            use_container_width=True,
+        )
+
+
+def _shared_balance_weight_range(
+    balance_row_sets: list[list[dict[str, object]]],
+) -> tuple[float, float]:
+    """Return one heatmap color range for side-by-side balance comparisons."""
+    max_weight = max(
+        (
+            float(row["total_weight"])
+            for balance_rows in balance_row_sets
+            for row in balance_rows
+        ),
+        default=0.0,
+    )
+    return (0.0, max(max_weight, 1.0))
 
 
 def render_visualization_section(
@@ -914,6 +1056,12 @@ def render_results() -> None:
     params = payload.get("params", helpers.SolverParams())
 
     successful = [entry for entry in results if entry["result"] is not None]
+    balance_weight_range = _shared_balance_weight_range(
+        [
+            helpers.bay_row_balance_rows(instance, entry["result"].solution)
+            for entry in successful
+        ]
+    )
     if len(successful) > 1:
         st.subheader("Algorithm comparison")
         comparison_rows = [
@@ -932,15 +1080,16 @@ def render_results() -> None:
             "Comparison uses shared final metrics. Raw objective values are not "
             "comparable across algorithms with different internal proxies."
         )
+        render_diagnostics_comparison(successful, instance, params, balance_weight_range)
 
     st.subheader("Results")
     if len(results) == 1:
-        render_result_detail(results[0], instance, params)
+        render_result_detail(results[0], instance, params, balance_weight_range)
     else:
         tabs = st.tabs([entry["algorithm"] for entry in results])
         for tab, entry in zip(tabs, results):
             with tab:
-                render_result_detail(entry, instance, params)
+                render_result_detail(entry, instance, params, balance_weight_range)
 
     _render_debug_expander(results)
 

@@ -31,6 +31,7 @@ from stowage_optimizer.core.metrics import (
     DEFAULT_CG_TOLERANCE_LAT,
     DEFAULT_CG_TOLERANCE_LON,
     DEFAULT_MIN_INCOMPATIBLE_BAY_DISTANCE,
+    StowageMetrics,
 )
 from stowage_optimizer.solvers import (
     GeneticSolver,
@@ -835,6 +836,293 @@ def is_uncertified_milp_incumbent(algorithm_label: str, result: SolverResult) ->
         and "incumbent" in detail
         and "not certified" in detail
     )
+
+
+# --------------------------------------------------------------------------- #
+# Visual diagnostics (Phase 12)                                                #
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True)
+class CgDiagnostic:
+    """Structured center-of-gravity diagnostic for the visual layer.
+
+    ``cg_x`` / ``cg_y`` are the computed horizontal center of gravity. The ideal
+    academic reference is the vessel geometric center ``(0, 0)`` (see
+    DESIGN.md section 10). Tolerance status is derived from the resolved
+    :class:`SolverParams` so it stays consistent with how the plan was evaluated.
+    """
+
+    cg_x: float
+    cg_y: float
+    tolerance_lon: float
+    tolerance_lat: float
+    within_lon_tolerance: bool
+    within_lat_tolerance: bool
+    ideal_x: float = 0.0
+    ideal_y: float = 0.0
+
+    @property
+    def within_tolerance(self) -> bool:
+        """Return whether both horizontal CG axes are within tolerance."""
+        return self.within_lon_tolerance and self.within_lat_tolerance
+
+    @property
+    def lon_deviation(self) -> float:
+        """Return the absolute longitudinal deviation from the ideal point."""
+        return abs(self.cg_x - self.ideal_x)
+
+    @property
+    def lat_deviation(self) -> float:
+        """Return the absolute lateral deviation from the ideal point."""
+        return abs(self.cg_y - self.ideal_y)
+
+
+@dataclass(frozen=True)
+class ViolationExplanation:
+    """One readable, actionable diagnostic line for the results UI.
+
+    ``severity`` is ``"error"`` for structural rule breaks, ``"warning"`` for a
+    horizontal CG tolerance breach (a structurally valid plan may still be
+    deliberately unbalanced), and ``"ok"`` for the positive "no issues" entry.
+    ``metric_key`` links the explanation back to the shared metric it summarizes.
+    """
+
+    code: str
+    title: str
+    severity: str
+    count: int
+    message: str
+    metric_key: str | None = None
+
+
+def bay_row_balance_rows(
+    instance: ProblemInstance, solution: StowageSolution
+) -> list[dict[str, object]]:
+    """Aggregate stowed weight and container counts per ``(bay, row)`` stack.
+
+    Returns one row for every ``(bay, row)`` stack in the vessel grid, including
+    empty stacks reported as zero, so the Streamlit balance map can render a
+    complete bay-row heatmap. Rows are ordered by ``(bay, row)``. Assignments
+    that reference an unknown container or a position outside the grid are
+    skipped defensively rather than raising, keeping the diagnostic robust for
+    partial or hand-built solutions.
+    """
+    containers_by_id = {container.id: container for container in instance.containers}
+
+    totals: dict[tuple[int, int], tuple[float, int]] = {}
+    for assignment in solution.assignments:
+        bay, row, _tier = assignment.slot_position
+        if not (1 <= bay <= instance.ship.bays and 1 <= row <= instance.ship.rows):
+            continue
+        container = containers_by_id.get(assignment.container_id)
+        if container is None:
+            continue
+        prev_weight, prev_count = totals.get((bay, row), (0.0, 0))
+        totals[(bay, row)] = (prev_weight + container.weight, prev_count + 1)
+
+    rows: list[dict[str, object]] = []
+    for bay in range(1, instance.ship.bays + 1):
+        for row in range(1, instance.ship.rows + 1):
+            weight, count = totals.get((bay, row), (0.0, 0))
+            rows.append(
+                {
+                    "bay": bay,
+                    "row": row,
+                    "total_weight": weight,
+                    "container_count": count,
+                }
+            )
+    return rows
+
+
+def cg_diagnostic(metrics: StowageMetrics, params: SolverParams) -> CgDiagnostic:
+    """Build the center-of-gravity diagnostic against the ideal point ``(0, 0)``.
+
+    Tolerance status is recomputed from the resolved :class:`SolverParams` so the
+    diagnostic is self-contained and testable with explicit tolerances while
+    matching the tolerances used to evaluate the plan.
+    """
+    return CgDiagnostic(
+        cg_x=metrics.cg_x,
+        cg_y=metrics.cg_y,
+        tolerance_lon=params.cg_tolerance_lon,
+        tolerance_lat=params.cg_tolerance_lat,
+        within_lon_tolerance=abs(metrics.cg_x) <= params.cg_tolerance_lon,
+        within_lat_tolerance=abs(metrics.cg_y) <= params.cg_tolerance_lat,
+    )
+
+
+def violation_explanations(result: SolverResult) -> list[ViolationExplanation]:
+    """Build readable, actionable diagnostics from a solver result.
+
+    Explanations are derived entirely from the shared final metrics so they stay
+    consistent with the comparison table and CSV exports. Structural rule breaks
+    are reported as errors; a horizontal CG tolerance breach is reported as a
+    warning because a structurally valid plan may still be deliberately
+    unbalanced. When nothing is wrong, a single positive ``"ok"`` entry is
+    returned.
+    """
+    metrics = result.metrics
+    explanations: list[ViolationExplanation] = []
+
+    if metrics.unassigned_container_count:
+        count = metrics.unassigned_container_count
+        explanations.append(
+            ViolationExplanation(
+                code="unassigned",
+                title="Unassigned containers",
+                severity="error",
+                count=count,
+                message=(
+                    f"{count} container(s) were not placed, so the stowage plan is "
+                    "incomplete. Add slot capacity, relax constraints, or try "
+                    "another algorithm."
+                ),
+                metric_key="unassigned_container_count",
+            )
+        )
+
+    if metrics.duplicate_slot_violations:
+        count = metrics.duplicate_slot_violations
+        explanations.append(
+            ViolationExplanation(
+                code="duplicate_slot",
+                title="Duplicate-slot violations",
+                severity="error",
+                count=count,
+                message=(
+                    f"{count} extra container(s) share an already-occupied slot. "
+                    "Each (bay, row, tier) position may hold at most one container."
+                ),
+                metric_key="duplicate_slot_violations",
+            )
+        )
+
+    if metrics.reefer_violations:
+        count = metrics.reefer_violations
+        explanations.append(
+            ViolationExplanation(
+                code="reefer",
+                title="Reefer violations",
+                severity="error",
+                count=count,
+                message=(
+                    f"{count} reefer container(s) are in non-reefer slots. Move them "
+                    "to reefer-capable positions or add more reefer slots."
+                ),
+                metric_key="reefer_violations",
+            )
+        )
+
+    if metrics.stack_continuity_violations:
+        count = metrics.stack_continuity_violations
+        explanations.append(
+            ViolationExplanation(
+                code="stack_continuity",
+                title="Stack-continuity violations",
+                severity="error",
+                count=count,
+                message=(
+                    f"{count} container(s) float above an empty slot. A tier may only "
+                    "be used when the slot directly below it is occupied."
+                ),
+                metric_key="stack_continuity_violations",
+            )
+        )
+
+    if metrics.incompatible_cargo_violations:
+        count = metrics.incompatible_cargo_violations
+        explanations.append(
+            ViolationExplanation(
+                code="incompatible_cargo",
+                title="Incompatible-cargo violations",
+                severity="error",
+                count=count,
+                message=(
+                    f"{count} Flammable/Oxidizer bay pair(s) are closer than the "
+                    "required minimum bay distance. Separate these cargo classes "
+                    "into more distant bays."
+                ),
+                metric_key="incompatible_cargo_violations",
+            )
+        )
+
+    if not metrics.within_lon_tolerance:
+        direction = "bow-heavy" if metrics.cg_x > 0 else "stern-heavy"
+        explanations.append(
+            ViolationExplanation(
+                code="cg_lon",
+                title="Longitudinal CG out of tolerance",
+                severity="warning",
+                count=1,
+                message=(
+                    f"Longitudinal CG x is {metrics.cg_x:.3f} ({direction}), outside "
+                    "the configured tolerance. Rebalance heavy containers along the "
+                    "bays or relax the longitudinal tolerance."
+                ),
+                metric_key="cg_x",
+            )
+        )
+
+    if not metrics.within_lat_tolerance:
+        direction = "starboard-heavy" if metrics.cg_y > 0 else "port-heavy"
+        explanations.append(
+            ViolationExplanation(
+                code="cg_lat",
+                title="Lateral CG out of tolerance",
+                severity="warning",
+                count=1,
+                message=(
+                    f"Lateral CG y is {metrics.cg_y:.3f} ({direction}), outside the "
+                    "configured tolerance. Rebalance heavy containers across the rows "
+                    "or relax the lateral tolerance."
+                ),
+                metric_key="cg_y",
+            )
+        )
+
+    if not explanations:
+        explanations.append(
+            ViolationExplanation(
+                code="none",
+                title="No violations",
+                severity="ok",
+                count=0,
+                message=(
+                    "No structural constraint violations and the horizontal center "
+                    "of gravity is within tolerance."
+                ),
+            )
+        )
+
+    return explanations
+
+
+def algorithm_diagnostic_row(algorithm_label: str, result: SolverResult) -> dict[str, object]:
+    """Build one row of the side-by-side visual-diagnostics comparison.
+
+    Focuses on feasibility, horizontal balance, and per-rule violation counts so
+    solver tradeoffs are easy to scan. Complements :func:`comparison_row`, which
+    carries the broader KPI set used for the comparison CSV export.
+    """
+    metrics = result.metrics
+    return {
+        "algorithm": algorithm_label,
+        "operational_feasible": result.is_feasible,
+        "structural_feasible": result.is_structurally_feasible,
+        "cg_ok": result.cg_within_tolerance,
+        "cg_x": round(metrics.cg_x, 4),
+        "cg_y": round(metrics.cg_y, 4),
+        "utilization": round(metrics.slot_utilization, 4),
+        "real_rehandling": metrics.real_rehandling,
+        "unassigned": metrics.unassigned_container_count,
+        "duplicate_slots": metrics.duplicate_slot_violations,
+        "reefer_violations": metrics.reefer_violations,
+        "stack_continuity_violations": metrics.stack_continuity_violations,
+        "incompatible_cargo_violations": metrics.incompatible_cargo_violations,
+        "total_violations": metrics.constraint_violations,
+    }
 
 
 def _rows_to_csv(rows: list[dict[str, object]], columns: tuple[str, ...]) -> str:

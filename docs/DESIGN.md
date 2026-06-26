@@ -811,6 +811,32 @@ and algorithm comparison tables are downloadable as CSV with stable column
 names. The app also exposes bundled 20-, 40-, 60-, and 80-container example
 datasets using the standard container CSV schema.
 
+Phase 12 adds a visual diagnostics layer on top of the shared final metrics.
+Data preparation is kept in testable, Streamlit-free helpers in
+`app/app_helpers.py`, and the Plotly figures live in
+`stowage_optimizer.viz.diagnostics`. The diagnostics are:
+
+- **Bay-row balance map** (`bay_row_balance_rows`): aggregated stowed weight and
+  container count per `(bay, row)` stack over the full vessel grid, rendered as a
+  weight heatmap so lateral/longitudinal weight concentration is visible at a
+  glance.
+- **Center-of-gravity diagnostic** (`cg_diagnostic`): the computed `(CG_x, CG_y)`
+  plotted against the ideal geometric center `(0, 0)` and the configured
+  tolerance box, with an explicit within-tolerance flag derived from the same
+  tolerances used to evaluate the plan.
+- **Violation explanations** (`violation_explanations`): readable, actionable
+  lines derived entirely from the shared metrics — unassigned containers,
+  duplicate-slot, reefer, stack-continuity, and incompatible-cargo violations
+  reported as errors, and a horizontal CG breach reported as a warning (because a
+  structurally valid plan may still be deliberately unbalanced). A clean plan
+  yields a single positive entry.
+- **Side-by-side comparison** (`algorithm_diagnostic_row`): a compact per-rule
+  diagnostics row plus paired CG and balance figures when more than one algorithm
+  is run, complementing the broader Phase 6 comparison table.
+
+These diagnostics only read existing structured result data; they do not change
+any metric semantics or solver formulations.
+
 Canonical scenarios:
 
 | Scenario | Purpose |

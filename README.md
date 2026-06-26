@@ -1,6 +1,6 @@
 # Container Ship Stowage Optimizer
 
-**Status:** Phases 1 through 11 completed. Phases 12 through 14 are planned roadmap extensions covering visual diagnostics, local search, and an academic explanation layer. Core domain models, validation, a small example instance, the common metrics engine, the greedy baseline solver, the exact MILP reference solver with incumbent recovery, the genetic algorithm solver, the Streamlit interface, Plotly 3D visualization, port-by-port unloading simulation, reproducible benchmark scenarios, benchmark runner helpers, project quality tooling, CI, coverage reporting, deployment readiness, scenario/result import and export, bundled downloadable datasets, and final academic documentation are implemented. The core package, solvers, benchmark helpers, Streamlit-independent app helpers, and visualization helpers are unit-tested.
+**Status:** Phases 1 through 12 completed. Phases 13 and 14 are planned roadmap extensions covering local search and an academic explanation layer. Core domain models, validation, a small example instance, the common metrics engine, the greedy baseline solver, the exact MILP reference solver with incumbent recovery, the genetic algorithm solver, the Streamlit interface, Plotly 3D visualization, port-by-port unloading simulation, visual diagnostics (bay-row balance map, center-of-gravity diagnostic, readable violation explanations, and side-by-side algorithm comparison), reproducible benchmark scenarios, benchmark runner helpers, project quality tooling, CI, coverage reporting, deployment readiness, scenario/result import and export, bundled downloadable datasets, and final academic documentation are implemented. The core package, solvers, benchmark helpers, Streamlit-independent app helpers, and visualization helpers are unit-tested.
 
 **Live app:** [container-ship-stowage-optimizer.streamlit.app](https://container-ship-stowage-optimizer.streamlit.app/)
 
@@ -423,7 +423,7 @@ Current roadmap status:
 | Phase 9 | Project Quality, Reproducibility & Deployment | Completed |
 | Phase 10 | MILP Incumbent Recovery | Completed |
 | Phase 11 | Scenario & Result Export/Import | Completed |
-| Phase 12 | Visual Diagnostics | Planned |
+| Phase 12 | Visual Diagnostics | Completed |
 | Phase 13 | Local Search after Greedy/GA | Planned |
 | Phase 14 | Academic Explanation & Learning Mode | Planned |
 
@@ -697,7 +697,10 @@ and objective weights, upload a container CSV (columns `id`, `weight`,
 `destination_port`, `type`) or use the built-in example, import/export a
 complete scenario as JSON, run the Greedy, MILP, and Genetic solvers, and
 inspect KPIs, the final stowage plan, a Plotly 3D stowage view, port-by-port
-unloading simulation, and an algorithm comparison table. The final plan,
+unloading simulation, visual diagnostics (a bay-row weight balance map, a
+center-of-gravity diagnostic against the ideal point, and readable constraint
+violation explanations), and an algorithm comparison table with side-by-side
+diagnostics. The final plan,
 metrics, and algorithm comparison can be downloaded as CSV. Bundled example
 datasets for 20, 40, 60, and 80 containers can be downloaded directly from
 the Streamlit sidebar. Validation errors are reported before any solver runs.
@@ -789,9 +792,8 @@ Safe optimizations that preserve the current model:
 - caching repeated GA fitness and metrics computations;
 - faster stack indexing for real rehandling simulation.
 
-Remaining product and presentation work is tracked in ROADMAP phases 12-14,
-including richer visual diagnostics, local search post-processing, and an
-academic explanation tab.
+Remaining product and presentation work is tracked in ROADMAP phases 13-14,
+including local search post-processing and an academic explanation tab.
 
 Higher-risk heuristic reductions should be documented separately because they
 can change the explored search space:
