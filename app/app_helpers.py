@@ -835,26 +835,44 @@ def local_search_summary_rows(result: SolverResult) -> list[dict[str, object]]:
     metadata = local_search.as_dict()
     return [
         {"metric": "Local search", "value": "Ran" if local_search.ran else "Skipped"},
-        {"metric": "Stopped reason", "value": metadata["stopped_reason"]},
-        {"metric": "Evaluated swaps", "value": metadata["evaluated_swaps"]},
-        {"metric": "Accepted swaps", "value": metadata["accepted_swaps"]},
-        {"metric": "Additional runtime (s)", "value": round(local_search.runtime_seconds, 4)},
-        {"metric": "abs(CG x) before", "value": round(abs(local_search.initial_metrics.cg_x), 4)},
-        {"metric": "abs(CG x) after", "value": round(abs(local_search.metrics.cg_x), 4)},
-        {"metric": "abs(CG y) before", "value": round(abs(local_search.initial_metrics.cg_y), 4)},
-        {"metric": "abs(CG y) after", "value": round(abs(local_search.metrics.cg_y), 4)},
+        {"metric": "Stopped reason", "value": str(metadata["stopped_reason"])},
+        {"metric": "Evaluated swaps", "value": str(metadata["evaluated_swaps"])},
+        {"metric": "Accepted swaps", "value": str(metadata["accepted_swaps"])},
+        {
+            "metric": "Additional runtime (s)",
+            "value": f"{local_search.runtime_seconds:.4f}",
+        },
+        {
+            "metric": "abs(CG x) before",
+            "value": f"{abs(local_search.initial_metrics.cg_x):.4f}",
+        },
+        {
+            "metric": "abs(CG x) after",
+            "value": f"{abs(local_search.metrics.cg_x):.4f}",
+        },
+        {
+            "metric": "abs(CG y) before",
+            "value": f"{abs(local_search.initial_metrics.cg_y):.4f}",
+        },
+        {
+            "metric": "abs(CG y) after",
+            "value": f"{abs(local_search.metrics.cg_y):.4f}",
+        },
         {
             "metric": "Real rehandling before",
-            "value": local_search.initial_metrics.real_rehandling,
+            "value": str(local_search.initial_metrics.real_rehandling),
         },
-        {"metric": "Real rehandling after", "value": local_search.metrics.real_rehandling},
+        {
+            "metric": "Real rehandling after",
+            "value": str(local_search.metrics.real_rehandling),
+        },
         {
             "metric": "Operationally feasible before",
-            "value": local_search.initial_metrics.operationally_feasible,
+            "value": str(local_search.initial_metrics.operationally_feasible),
         },
         {
             "metric": "Operationally feasible after",
-            "value": local_search.metrics.operationally_feasible,
+            "value": str(local_search.metrics.operationally_feasible),
         },
     ]
 

@@ -377,6 +377,7 @@ def test_local_search_summary_rows_report_disabled_and_enabled_runs() -> None:
     assert "Accepted swaps" in labels
     assert "abs(CG x) before" in labels
     assert "Real rehandling after" in labels
+    assert all(isinstance(row["value"], str) for row in rows)
     assert enabled.local_search_result is not None
 
 
