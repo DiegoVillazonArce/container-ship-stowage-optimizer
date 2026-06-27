@@ -868,7 +868,12 @@ def render_diagnostics_section(
         title=f"{algorithm_label}: bay-row weight balance",
         weight_range=balance_weight_range,
     )
-    columns[0].plotly_chart(balance_figure, use_container_width=True)
+    diag_key_prefix = _streamlit_key("diagnostics", algorithm_label)
+    columns[0].plotly_chart(
+        balance_figure,
+        use_container_width=True,
+        key=f"{diag_key_prefix}_balance",
+    )
 
     diagnostic = helpers.cg_diagnostic(result.metrics, params)
     cg_figure = build_cg_diagnostic_figure(
@@ -878,7 +883,11 @@ def render_diagnostics_section(
         diagnostic.tolerance_lat,
         title=f"{algorithm_label}: center of gravity vs. ideal",
     )
-    columns[1].plotly_chart(cg_figure, use_container_width=True)
+    columns[1].plotly_chart(
+        cg_figure,
+        use_container_width=True,
+        key=f"{diag_key_prefix}_cg",
+    )
     if diagnostic.within_tolerance:
         columns[1].success(
             f"CG within tolerance — x={diagnostic.cg_x:.3f}, y={diagnostic.cg_y:.3f} "
@@ -939,6 +948,7 @@ def render_diagnostics_comparison(
                 title=f"{entry['algorithm']} CG",
             ),
             use_container_width=True,
+            key=f"{_streamlit_key('comparison', entry['algorithm'])}_cg",
         )
 
     st.markdown("**Bay-row balance by algorithm**")
@@ -956,6 +966,7 @@ def render_diagnostics_comparison(
                 weight_range=balance_weight_range,
             ),
             use_container_width=True,
+            key=f"{_streamlit_key('comparison', entry['algorithm'])}_balance",
         )
 
 
@@ -997,7 +1008,11 @@ def render_visualization_section(
         color_by=color_by,
         title=f"{algorithm_label} stowage plan",
     )
-    st.plotly_chart(figure, use_container_width=True)
+    st.plotly_chart(
+        figure,
+        use_container_width=True,
+        key=f"{key_prefix}_stowage",
+    )
 
     st.markdown("**Unloading simulation**")
     steps = simulate_unloading_events(instance, result.solution)
@@ -1050,7 +1065,11 @@ def render_visualization_section(
         highlighted_container_ids=selected_step.rehandled_container_ids,
         title=f"After unloading {selected_step.port}",
     )
-    st.plotly_chart(remaining_figure, use_container_width=True)
+    st.plotly_chart(
+        remaining_figure,
+        use_container_width=True,
+        key=f"{key_prefix}_remaining_{_streamlit_key(selected_step.port)}",
+    )
 
 
 def _render_container_id_table(
