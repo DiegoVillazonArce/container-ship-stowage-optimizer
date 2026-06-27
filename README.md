@@ -1,12 +1,12 @@
 # Container Ship Stowage Optimizer
 
-**Status:** Phases 1 through 12 completed. Phases 13 and 14 are planned roadmap extensions covering local search and an academic explanation layer. Core domain models, validation, a small example instance, the common metrics engine, the greedy baseline solver, the exact MILP reference solver with incumbent recovery, the genetic algorithm solver, the Streamlit interface, Plotly 3D visualization, port-by-port unloading simulation, visual diagnostics (bay-row balance map, center-of-gravity diagnostic, readable violation explanations, and side-by-side algorithm comparison), reproducible benchmark scenarios, benchmark runner helpers, project quality tooling, CI, coverage reporting, deployment readiness, scenario/result import and export, bundled downloadable datasets, and final academic documentation are implemented. The core package, solvers, benchmark helpers, Streamlit-independent app helpers, and visualization helpers are unit-tested.
+**Status:** Phases 1 through 13 completed. Phase 14 is a planned roadmap extension covering an academic explanation layer. Core domain models, validation, a small example instance, the common metrics engine, the greedy baseline solver, the exact MILP reference solver with incumbent recovery, the genetic algorithm solver, optional swap-based local search after Greedy/GA, the Streamlit interface, Plotly 3D visualization, port-by-port unloading simulation, visual diagnostics (bay-row balance map, center-of-gravity diagnostic, readable violation explanations, and side-by-side algorithm comparison), reproducible benchmark scenarios, benchmark runner helpers, project quality tooling, CI, coverage reporting, deployment readiness, scenario/result import and export, bundled downloadable datasets, and final academic documentation are implemented. The core package, solvers, benchmark helpers, Streamlit-independent app helpers, and visualization helpers are unit-tested.
 
 **Live app:** [container-ship-stowage-optimizer.streamlit.app](https://container-ship-stowage-optimizer.streamlit.app/)
 
 ## Current Repository State
 
-This repository contains the project planning documentation plus the completed implementation increments. The current Python package includes vessel slots and normalized coordinates, container and route models, problem instances, pre-solver validation, a small hand-checkable example, a common metrics engine (weight, utilization, center-of-gravity moments, side and end balance, constraint-violation counts, and real rehandling by simulated unloading), a common solver interface, the greedy baseline solver with optional swap-based repair, the MILP exact reference solver (PuLP/CBC) enforcing the hard constraints, minimizing the linear objective, and recovering feasible non-certified incumbents, the genetic algorithm metaheuristic solver, the Streamlit interface with Plotly 3D visualization, unloading simulation, scenario JSON import/export, CSV result downloads, bundled example dataset downloads, reproducible benchmark scenarios, benchmark table exporters, and automated tests.
+This repository contains the project planning documentation plus the completed implementation increments. The current Python package includes vessel slots and normalized coordinates, container and route models, problem instances, pre-solver validation, a small hand-checkable example, a common metrics engine (weight, utilization, center-of-gravity moments, side and end balance, constraint-violation counts, and real rehandling by simulated unloading), a common solver interface, the greedy baseline solver with optional swap-based repair and local-search post-processing, the MILP exact reference solver (PuLP/CBC) enforcing the hard constraints, minimizing the linear objective, and recovering feasible non-certified incumbents, the genetic algorithm metaheuristic solver with optional final local search, the Streamlit interface with Plotly 3D visualization, unloading simulation, scenario JSON import/export, CSV result downloads, bundled example dataset downloads, reproducible benchmark scenarios, benchmark table exporters, and automated tests.
 
 The detailed implementation plan is maintained in [ROADMAP.md](./ROADMAP.md). The roadmap is the source of truth for phase boundaries. Technical model details are documented in [docs/DESIGN.md](./docs/DESIGN.md), and benchmark reproduction notes are documented in [docs/BENCHMARKS.md](./docs/BENCHMARKS.md).
 
@@ -234,6 +234,10 @@ Candidate libraries:
 
 The genetic algorithm is implemented for larger instances where MILP becomes computationally expensive. Its main challenges are solution encoding, feasibility-preserving mutation and crossover, efficient evaluation, and repair mechanisms for invalid assignments.
 
+### Local Search Post-processing
+
+Greedy and Genetic Algorithm runs can optionally apply a deterministic swap-based local search after their base solution is produced. The local search swaps pairs of already-assigned containers, evaluates each candidate with the shared `evaluate_solution` metrics, rejects swaps that introduce structural hard-constraint violations, and accepts only score-improving moves based on horizontal CG deviation, CG tolerance excess, real rehandling, and a mild vertical CG guard. It reports evaluated and accepted swaps, additional runtime, and before/after CG and rehandling metrics.
+
 ---
 
 ## 8. Input Data
@@ -424,7 +428,7 @@ Current roadmap status:
 | Phase 10 | MILP Incumbent Recovery | Completed |
 | Phase 11 | Scenario & Result Export/Import | Completed |
 | Phase 12 | Visual Diagnostics | Completed |
-| Phase 13 | Local Search after Greedy/GA | Planned |
+| Phase 13 | Local Search after Greedy/GA | Completed |
 | Phase 14 | Academic Explanation & Learning Mode | Planned |
 
 The implemented benchmark layer compares algorithms through shared final metrics. Raw internal objective values are reported when available, but they should not be interpreted as equivalent across Greedy, MILP, and Genetic Algorithm runs.
@@ -695,7 +699,8 @@ powershell -ExecutionPolicy Bypass -File .\run_app.ps1
 The interface lets you configure the vessel grid, reefer slots, route,
 and objective weights, upload a container CSV (columns `id`, `weight`,
 `destination_port`, `type`) or use the built-in example, import/export a
-complete scenario as JSON, run the Greedy, MILP, and Genetic solvers, and
+complete scenario as JSON, run the Greedy, MILP, and Genetic solvers, optionally
+apply local search after Greedy or Genetic Algorithm runs, and
 inspect KPIs, the final stowage plan, a Plotly 3D stowage view, port-by-port
 unloading simulation, visual diagnostics (a bay-row weight balance map, a
 center-of-gravity diagnostic against the ideal point, and readable constraint
@@ -792,15 +797,15 @@ Safe optimizations that preserve the current model:
 - caching repeated GA fitness and metrics computations;
 - faster stack indexing for real rehandling simulation.
 
-Remaining product and presentation work is tracked in ROADMAP phases 13-14,
-including local search post-processing and an academic explanation tab.
+Remaining product and presentation work is tracked in ROADMAP Phase 14,
+including an academic explanation tab.
 
 Higher-risk heuristic reductions should be documented separately because they
 can change the explored search space:
 
 - pruning candidate bays by destination or cargo priority;
 - limiting GA candidates for medium and large scenarios;
-- hybrid solver workflows beyond the planned swap-based local search;
+- hybrid solver workflows beyond the current swap-based local search;
 - decomposition or rolling-horizon methods for larger MILP experiments.
 
 ---

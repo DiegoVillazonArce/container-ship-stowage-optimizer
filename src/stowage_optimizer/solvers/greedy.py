@@ -14,21 +14,16 @@ best score. The score balances four concerns from DESIGN.md sections 10-13:
 Construction enforces slot capacity, stack continuity, and reefer
 compatibility as hard rules: a slot is only a candidate if it is empty,
 supported from below, and reefer-capable when required. After construction an
-optional swap-based repair tries to remove any remaining violations.
-
-Known limitation: repair only runs when the result is *structurally* infeasible
-(capacity, continuity, reefer, or incompatible-cargo violations). When the
-construction is structurally valid but horizontal CG falls outside tolerance,
-the greedy solver reports it as infeasible without attempting to rebalance. CG
-balancing is left to the MILP and Genetic solvers; adding a balance-oriented
-local search to the greedy baseline is tracked as a future enhancement
-(ROADMAP, "Add more advanced local search after Greedy or GA").
+optional swap-based repair tries to remove structural violations. A separate
+optional local-search post-processing step can then swap assigned containers to
+rebalance horizontal CG and reduce real rehandling while preserving hard
+constraints.
 """
 
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from stowage_optimizer.core.container import Container, ContainerType
 from stowage_optimizer.core.metrics import (
@@ -45,6 +40,12 @@ from stowage_optimizer.solvers.base import (
     SolverResult,
     SolverStatus,
     validate_solver_input,
+)
+from stowage_optimizer.solvers.local_search import (
+    LocalSearchConfig,
+    LocalSearchResult,
+    LocalSearchWeights,
+    improve_solution,
 )
 
 # Maximum number of full improvement passes attempted during swap repair.
@@ -75,12 +76,29 @@ class GreedySolver(Solver):
         cg_tolerance_lat: float = DEFAULT_CG_TOLERANCE_LAT,
         min_incompatible_bay_distance: int = DEFAULT_MIN_INCOMPATIBLE_BAY_DISTANCE,
         enable_repair: bool = True,
+        enable_local_search: bool = False,
+        local_search_config: LocalSearchConfig | None = None,
     ) -> None:
         self._weights = weights
         self._cg_tolerance_lon = cg_tolerance_lon
         self._cg_tolerance_lat = cg_tolerance_lat
         self._min_distance = min_incompatible_bay_distance
         self._enable_repair = enable_repair
+        self._enable_local_search = enable_local_search
+        base_local_search_config = local_search_config or LocalSearchConfig(
+            weights=LocalSearchWeights(
+                cg_lon=weights.cg_lon,
+                cg_lat=weights.cg_lat,
+                rehandling=weights.rehandling,
+                vertical=0.05 * weights.vertical,
+            )
+        )
+        self._local_search_config = replace(
+            base_local_search_config,
+            cg_tolerance_lon=cg_tolerance_lon,
+            cg_tolerance_lat=cg_tolerance_lat,
+            min_incompatible_bay_distance=min_incompatible_bay_distance,
+        )
 
     def solve(self, instance: ProblemInstance) -> SolverResult:
         start = time.perf_counter()
@@ -104,6 +122,7 @@ class GreedySolver(Solver):
             min_incompatible_bay_distance=self._min_distance,
         )
         status = SolverStatus.FEASIBLE if metrics.is_feasible else SolverStatus.INFEASIBLE
+        repair_applied = False
 
         if not metrics.is_structurally_feasible and self._enable_repair:
             repaired = self._repair(instance, assignment)
@@ -118,8 +137,24 @@ class GreedySolver(Solver):
             if repaired_metrics.is_feasible:
                 solution, metrics = repaired_solution, repaired_metrics
                 status = SolverStatus.REPAIRED
+                repair_applied = True
             elif repaired_metrics.constraint_violations < metrics.constraint_violations:
                 solution, metrics = repaired_solution, repaired_metrics
+                status = SolverStatus.INFEASIBLE
+                repair_applied = True
+
+        local_search_result: LocalSearchResult | None = None
+        if self._enable_local_search:
+            local_search_result = improve_solution(
+                instance,
+                solution,
+                config=self._local_search_config,
+            )
+            solution = local_search_result.solution
+            metrics = local_search_result.metrics
+            if metrics.is_feasible:
+                status = SolverStatus.REPAIRED if repair_applied else SolverStatus.FEASIBLE
+            else:
                 status = SolverStatus.INFEASIBLE
 
         runtime = time.perf_counter() - start
@@ -128,6 +163,7 @@ class GreedySolver(Solver):
             status=status,
             runtime_seconds=runtime,
             metrics=metrics,
+            local_search_result=local_search_result,
         )
 
     # -- Construction ----------------------------------------------------

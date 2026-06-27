@@ -236,6 +236,34 @@ def test_solver_params_propagate_to_genetic_solver() -> None:
     assert solver._config.random_seed == 7
 
 
+def test_solver_params_propagate_to_local_search_config() -> None:
+    params = helpers.SolverParams(
+        greedy_local_search_enabled=True,
+        ga_local_search_enabled=True,
+        local_search_max_iterations=25,
+        local_search_max_rounds_without_improvement=3,
+        local_search_time_limit_seconds=1.5,
+        cg_tolerance_lon=0.20,
+        cg_tolerance_lat=0.30,
+        min_incompatible_bay_distance=2,
+    )
+
+    config = helpers.local_search_config_from_params(params)
+    greedy = helpers.build_solver("Greedy", params)
+    genetic = helpers.build_solver("Genetic Algorithm", params)
+
+    assert config.max_iterations == 25
+    assert config.max_rounds_without_improvement == 3
+    assert config.time_limit_seconds == 1.5
+    assert config.cg_tolerance_lon == 0.20
+    assert config.cg_tolerance_lat == 0.30
+    assert config.min_incompatible_bay_distance == 2
+    assert greedy._enable_local_search is True
+    assert greedy._local_search_config.max_iterations == 25
+    assert genetic._config.enable_local_search is True
+    assert genetic._local_search_config.max_rounds_without_improvement == 3
+
+
 def test_milp_size_guard_allows_small_ui_instances() -> None:
     instance = create_small_example_instance()
 
@@ -319,6 +347,39 @@ def test_comparison_row_distinguishes_cg_tolerance_failure() -> None:
     assert row["operational_feasible"] is False
 
 
+def test_local_search_summary_rows_report_disabled_and_enabled_runs() -> None:
+    instance = ProblemInstance(
+        ship=Ship(bays=3, rows=1, tiers=1),
+        route=Route(("Panama",)),
+        containers=(
+            Container("H", 30.0, "Panama", ContainerType.NORMAL),
+            Container("M", 29.0, "Panama", ContainerType.NORMAL),
+            Container("L", 1.0, "Panama", ContainerType.NORMAL),
+        ),
+    )
+
+    disabled = helpers.build_solver("Greedy", helpers.SolverParams()).solve(instance)
+    enabled = helpers.build_solver(
+        "Greedy",
+        helpers.SolverParams(
+            greedy_local_search_enabled=True,
+            local_search_max_iterations=10,
+        ),
+    ).solve(instance)
+
+    assert helpers.local_search_summary_rows(disabled) == [
+        {"metric": "Local search", "value": "Disabled"}
+    ]
+
+    rows = helpers.local_search_summary_rows(enabled)
+    labels = {row["metric"] for row in rows}
+    assert "Evaluated swaps" in labels
+    assert "Accepted swaps" in labels
+    assert "abs(CG x) before" in labels
+    assert "Real rehandling after" in labels
+    assert enabled.local_search_result is not None
+
+
 def test_result_status_message_explains_uncertified_milp_incumbent() -> None:
     instance = create_small_example_instance()
     result = helpers.build_solver("Greedy", helpers.SolverParams()).solve(instance)
@@ -379,6 +440,11 @@ def test_scenario_export_json_contains_complete_payload() -> None:
         ga_mutation_probability=0.10,
         ga_crossover_probability=0.70,
         ga_random_seed=99,
+        greedy_local_search_enabled=True,
+        ga_local_search_enabled=True,
+        local_search_max_iterations=123,
+        local_search_max_rounds_without_improvement=4,
+        local_search_time_limit_seconds=2.5,
     )
 
     payload = json.loads(
@@ -408,6 +474,11 @@ def test_scenario_export_json_contains_complete_payload() -> None:
     ]
     assert payload["solver_settings"]["milp_time_limit_seconds"] == 12.5
     assert payload["solver_settings"]["ga_random_seed"] == 99
+    assert payload["solver_settings"]["greedy_local_search_enabled"] is True
+    assert payload["solver_settings"]["ga_local_search_enabled"] is True
+    assert payload["solver_settings"]["local_search_max_iterations"] == 123
+    assert payload["solver_settings"]["local_search_max_rounds_without_improvement"] == 4
+    assert payload["solver_settings"]["local_search_time_limit_seconds"] == 2.5
 
 
 def test_import_scenario_json_round_trip_reproduces_payload() -> None:
@@ -429,6 +500,33 @@ def test_import_scenario_json_round_trip_reproduces_payload() -> None:
     assert helpers.scenario_to_dict(
         imported.instance, imported.params, imported.algorithms
     ) == json.loads(original)
+
+
+def test_import_scenario_json_accepts_missing_local_search_settings() -> None:
+    instance = create_small_example_instance()
+    payload = helpers.scenario_to_dict(instance, helpers.SolverParams(), ("Greedy",))
+    settings = payload["solver_settings"]
+    for key in (
+        "greedy_local_search_enabled",
+        "ga_local_search_enabled",
+        "local_search_max_iterations",
+        "local_search_max_rounds_without_improvement",
+        "local_search_time_limit_seconds",
+    ):
+        settings.pop(key)
+
+    imported = helpers.import_scenario_json(json.dumps(payload))
+
+    assert imported.ok
+    assert imported.params.greedy_local_search_enabled is False
+    assert imported.params.ga_local_search_enabled is False
+    assert imported.params.local_search_max_iterations == (
+        helpers.DEFAULT_LOCAL_SEARCH_MAX_ITERATIONS
+    )
+    assert imported.params.local_search_max_rounds_without_improvement == (
+        helpers.DEFAULT_LOCAL_SEARCH_MAX_ROUNDS_WITHOUT_IMPROVEMENT
+    )
+    assert imported.params.local_search_time_limit_seconds is None
 
 
 def test_import_scenario_json_reports_invalid_domain_data() -> None:

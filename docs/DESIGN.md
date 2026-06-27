@@ -643,7 +643,8 @@ This is not part of the main formulation.
 
 ## 15. Solver Strategy
 
-The project compares three solver families.
+The project compares three solver families plus optional post-processing for
+heuristic outputs.
 
 ### Greedy Solver
 
@@ -689,6 +690,51 @@ Expected behavior:
 - Use mutation, crossover, selection, and repair.
 - Penalize infeasibility.
 - Evaluate real rehandling through simulation when feasible.
+
+### Local Search Post-processing
+
+Role:
+
+- Optional improvement step after Greedy or Genetic Algorithm outputs.
+- Rebalance horizontal CG and reduce real rehandling without changing the base
+  solver formulations.
+- Preserve hard constraints for every accepted move.
+
+Neighborhood:
+
+- The search considers pairwise swaps between already-assigned containers.
+- The occupied slot set is unchanged by a swap, so unique slot usage and stack
+  continuity are preserved when the starting solution is structurally feasible.
+- Reefer compatibility and incompatible-cargo separation depend on which
+  container occupies each slot, so every candidate is still evaluated through
+  `evaluate_solution`.
+
+Acceptance:
+
+- The starting solution must have zero structural constraint violations. If it
+  does not, local search is skipped and the original solution is reported.
+- A candidate swap is rejected if common metrics report any structural
+  violation: unassigned containers, duplicate slots, stack continuity, reefer
+  compatibility, or incompatible cargo separation.
+- Remaining candidates are scored by weighted horizontal CG tolerance excess,
+  absolute `CG_x`/`CG_y` deviation, real rehandling, and a small `CG_z`
+  component.
+- A candidate is accepted only when it strictly improves the score and does not
+  worsen normalized `CG_z` beyond the configured guard.
+
+Stopping:
+
+- Maximum evaluated swaps.
+- Maximum full rounds without an accepted improvement.
+- Optional runtime limit in seconds.
+
+Reporting:
+
+- Whether local search ran or was skipped.
+- Evaluated swaps, accepted swaps, completed rounds, stop reason, and added
+  runtime.
+- Before/after absolute `CG_x`, absolute `CG_y`, real rehandling, and
+  operational feasibility.
 
 ## 16. Metrics and Evaluation
 
@@ -837,6 +883,12 @@ Data preparation is kept in testable, Streamlit-free helpers in
 These diagnostics only read existing structured result data; they do not change
 any metric semantics or solver formulations.
 
+Phase 13 adds optional swap-based local search after Greedy and Genetic
+Algorithm results. The implementation is reusable solver logic, not Streamlit
+logic: it accepts a complete solution, evaluates swap candidates with the common
+metrics layer, preserves structural hard constraints, and reports its own
+iterations, accepted swaps, runtime, and before/after CG/rehandling metrics.
+
 Canonical scenarios:
 
 | Scenario | Purpose |
@@ -897,8 +949,7 @@ Possible extensions include:
 - Multiple dangerous cargo classes and richer separation rules.
 - Sensitivity analysis for objective weights.
 - More advanced visual diagnostics and academic explanation inside the app.
-- Local search improvement after Greedy or Genetic Algorithm outputs.
-- Hybrid GA with repair and local optimization.
+- Broader hybrid GA workflows that build on the current local optimization.
 - Decomposition methods for large MILP instances.
 - Parallel fitness evaluation for the Genetic Algorithm.
 - More detailed unloading simulation.
@@ -924,5 +975,5 @@ should be documented and benchmarked separately:
 
 - Destination- or cargo-priority candidate pruning.
 - Limiting GA candidate bays for medium and large instances.
-- Greedy construction followed by local search.
+- Wider local-search neighborhoods beyond pairwise assigned-container swaps.
 - Rolling-horizon, decomposition, or hybrid MILP/heuristic workflows.

@@ -38,6 +38,7 @@ from stowage_optimizer.solvers import (
     GeneticWeights,
     GreedySolver,
     GreedyWeights,
+    LocalSearchConfig,
     MILPSolver,
     MILPWeights,
     Solver,
@@ -101,6 +102,9 @@ GA_PRESETS: dict[str, dict[str, int]] = {
     "Balanced": {"population_size": 50, "max_generations": 100},
     "Deeper search": {"population_size": 80, "max_generations": 250},
 }
+
+DEFAULT_LOCAL_SEARCH_MAX_ITERATIONS = 500
+DEFAULT_LOCAL_SEARCH_MAX_ROUNDS_WITHOUT_IMPROVEMENT = 2
 
 # Human-readable labels for the flat metrics dictionary produced by
 # ``StowageMetrics.as_dict``. Used to render the common metrics table.
@@ -394,6 +398,13 @@ class SolverParams:
     ga_mutation_probability: float = 0.05
     ga_crossover_probability: float = 0.80
     ga_random_seed: int | None = 42
+    greedy_local_search_enabled: bool = False
+    ga_local_search_enabled: bool = False
+    local_search_max_iterations: int = DEFAULT_LOCAL_SEARCH_MAX_ITERATIONS
+    local_search_max_rounds_without_improvement: int = (
+        DEFAULT_LOCAL_SEARCH_MAX_ROUNDS_WITHOUT_IMPROVEMENT
+    )
+    local_search_time_limit_seconds: float | None = None
 
 
 @dataclass(frozen=True)
@@ -466,6 +477,13 @@ def scenario_to_dict(
             "ga_mutation_probability": params.ga_mutation_probability,
             "ga_crossover_probability": params.ga_crossover_probability,
             "ga_random_seed": params.ga_random_seed,
+            "greedy_local_search_enabled": params.greedy_local_search_enabled,
+            "ga_local_search_enabled": params.ga_local_search_enabled,
+            "local_search_max_iterations": params.local_search_max_iterations,
+            "local_search_max_rounds_without_improvement": (
+                params.local_search_max_rounds_without_improvement
+            ),
+            "local_search_time_limit_seconds": params.local_search_time_limit_seconds,
         },
     }
 
@@ -659,6 +677,8 @@ def build_solver(algorithm: str, params: SolverParams) -> Solver:
             cg_tolerance_lon=params.cg_tolerance_lon,
             cg_tolerance_lat=params.cg_tolerance_lat,
             min_incompatible_bay_distance=params.min_incompatible_bay_distance,
+            enable_local_search=params.greedy_local_search_enabled,
+            local_search_config=local_search_config_from_params(params),
         )
 
     if algorithm == "MILP":
@@ -691,9 +711,23 @@ def build_solver(algorithm: str, params: SolverParams) -> Solver:
             cg_tolerance_lon=params.cg_tolerance_lon,
             cg_tolerance_lat=params.cg_tolerance_lat,
             min_incompatible_bay_distance=params.min_incompatible_bay_distance,
+            enable_local_search=params.ga_local_search_enabled,
+            local_search_config=local_search_config_from_params(params),
         )
 
     raise ValueError(f"Unknown algorithm: {algorithm!r}. Expected one of {ALGORITHMS}.")
+
+
+def local_search_config_from_params(params: SolverParams) -> LocalSearchConfig:
+    """Build the reusable local-search config from app-level solver params."""
+    return LocalSearchConfig(
+        max_iterations=params.local_search_max_iterations,
+        max_rounds_without_improvement=params.local_search_max_rounds_without_improvement,
+        time_limit_seconds=params.local_search_time_limit_seconds,
+        cg_tolerance_lon=params.cg_tolerance_lon,
+        cg_tolerance_lat=params.cg_tolerance_lat,
+        min_incompatible_bay_distance=params.min_incompatible_bay_distance,
+    )
 
 
 def milp_assignment_variable_upper_bound(instance: ProblemInstance) -> int:
@@ -790,6 +824,39 @@ def comparison_row(algorithm_label: str, result: SolverResult) -> dict[str, obje
             round(result.objective_value, 4) if result.objective_value is not None else None
         ),
     }
+
+
+def local_search_summary_rows(result: SolverResult) -> list[dict[str, object]]:
+    """Return compact rows describing optional local-search post-processing."""
+    local_search = result.local_search_result
+    if local_search is None:
+        return [{"metric": "Local search", "value": "Disabled"}]
+
+    metadata = local_search.as_dict()
+    return [
+        {"metric": "Local search", "value": "Ran" if local_search.ran else "Skipped"},
+        {"metric": "Stopped reason", "value": metadata["stopped_reason"]},
+        {"metric": "Evaluated swaps", "value": metadata["evaluated_swaps"]},
+        {"metric": "Accepted swaps", "value": metadata["accepted_swaps"]},
+        {"metric": "Additional runtime (s)", "value": round(local_search.runtime_seconds, 4)},
+        {"metric": "abs(CG x) before", "value": round(abs(local_search.initial_metrics.cg_x), 4)},
+        {"metric": "abs(CG x) after", "value": round(abs(local_search.metrics.cg_x), 4)},
+        {"metric": "abs(CG y) before", "value": round(abs(local_search.initial_metrics.cg_y), 4)},
+        {"metric": "abs(CG y) after", "value": round(abs(local_search.metrics.cg_y), 4)},
+        {
+            "metric": "Real rehandling before",
+            "value": local_search.initial_metrics.real_rehandling,
+        },
+        {"metric": "Real rehandling after", "value": local_search.metrics.real_rehandling},
+        {
+            "metric": "Operationally feasible before",
+            "value": local_search.initial_metrics.operationally_feasible,
+        },
+        {
+            "metric": "Operationally feasible after",
+            "value": local_search.metrics.operationally_feasible,
+        },
+    ]
 
 
 def result_status_message(algorithm_label: str, result: SolverResult) -> tuple[str, str]:
@@ -1213,6 +1280,41 @@ def _solver_params_from_payload(payload: dict[str, Any]) -> tuple[SolverParams, 
         errors,
         default=0.80,
     )
+    greedy_local_search_enabled = _optional_bool_payload_field(
+        settings,
+        "greedy_local_search_enabled",
+        "solver_settings.greedy_local_search_enabled",
+        errors,
+        default=False,
+    )
+    ga_local_search_enabled = _optional_bool_payload_field(
+        settings,
+        "ga_local_search_enabled",
+        "solver_settings.ga_local_search_enabled",
+        errors,
+        default=False,
+    )
+    local_search_iterations = _optional_int_payload_field_with_default(
+        settings,
+        "local_search_max_iterations",
+        "solver_settings.local_search_max_iterations",
+        errors,
+        default=DEFAULT_LOCAL_SEARCH_MAX_ITERATIONS,
+    )
+    local_search_rounds = _optional_int_payload_field_with_default(
+        settings,
+        "local_search_max_rounds_without_improvement",
+        "solver_settings.local_search_max_rounds_without_improvement",
+        errors,
+        default=DEFAULT_LOCAL_SEARCH_MAX_ROUNDS_WITHOUT_IMPROVEMENT,
+    )
+    local_search_time_limit = _optional_float_payload_field_with_default(
+        settings,
+        "local_search_time_limit_seconds",
+        "solver_settings.local_search_time_limit_seconds",
+        errors,
+        default=None,
+    )
 
     if min_distance < 0:
         errors.append("solver_settings.min_incompatible_bay_distance must be non-negative.")
@@ -1226,6 +1328,16 @@ def _solver_params_from_payload(payload: dict[str, Any]) -> tuple[SolverParams, 
         errors.append("solver_settings.ga_mutation_probability must be between 0 and 1.")
     if not 0.0 <= ga_crossover <= 1.0:
         errors.append("solver_settings.ga_crossover_probability must be between 0 and 1.")
+    if local_search_iterations < 0:
+        errors.append("solver_settings.local_search_max_iterations must be non-negative.")
+    if local_search_rounds < 1:
+        errors.append(
+            "solver_settings.local_search_max_rounds_without_improvement must be at least 1."
+        )
+    if local_search_time_limit is not None and local_search_time_limit < 0:
+        errors.append(
+            "solver_settings.local_search_time_limit_seconds must be non-negative or null."
+        )
 
     params = SolverParams(
         cg_lon=_float_payload_field(
@@ -1261,6 +1373,11 @@ def _solver_params_from_payload(payload: dict[str, Any]) -> tuple[SolverParams, 
         ga_mutation_probability=ga_mutation,
         ga_crossover_probability=ga_crossover,
         ga_random_seed=ga_seed,
+        greedy_local_search_enabled=greedy_local_search_enabled,
+        ga_local_search_enabled=ga_local_search_enabled,
+        local_search_max_iterations=local_search_iterations,
+        local_search_max_rounds_without_improvement=local_search_rounds,
+        local_search_time_limit_seconds=local_search_time_limit,
     )
     return params, tuple(errors)
 
@@ -1329,6 +1446,25 @@ def _optional_float_payload_field(
     return float(value)
 
 
+def _optional_float_payload_field_with_default(
+    mapping: dict[str, Any],
+    key: str,
+    label: str,
+    errors: list[str],
+    *,
+    default: float | None,
+) -> float | None:
+    if key not in mapping:
+        return default
+    value = mapping[key]
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        errors.append(f"Scenario field `{label}` must be a finite number or null.")
+        return default
+    return float(value)
+
+
 def _int_payload_field(
     mapping: dict[str, Any],
     key: str,
@@ -1358,6 +1494,36 @@ def _optional_int_payload_field(
     if value is None:
         return None
     return _int_value(value, label, errors, default=default if default is not None else 0)
+
+
+def _optional_int_payload_field_with_default(
+    mapping: dict[str, Any],
+    key: str,
+    label: str,
+    errors: list[str],
+    *,
+    default: int,
+) -> int:
+    if key not in mapping:
+        return default
+    return _int_value(mapping[key], label, errors, default=default)
+
+
+def _optional_bool_payload_field(
+    mapping: dict[str, Any],
+    key: str,
+    label: str,
+    errors: list[str],
+    *,
+    default: bool,
+) -> bool:
+    if key not in mapping:
+        return default
+    value = mapping[key]
+    if not isinstance(value, bool):
+        errors.append(f"Scenario field `{label}` must be true or false.")
+        return default
+    return value
 
 
 def _int_value(value: Any, label: str, errors: list[str], *, default: int) -> int:

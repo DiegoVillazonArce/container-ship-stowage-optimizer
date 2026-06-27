@@ -3,6 +3,13 @@
 from stowage_optimizer.solvers.base import Solver, SolverResult, SolverStatus
 from stowage_optimizer.solvers.genetic import GeneticConfig, GeneticSolver, GeneticWeights
 from stowage_optimizer.solvers.greedy import GreedySolver, GreedyWeights
+from stowage_optimizer.solvers.local_search import (
+    LocalSearchConfig,
+    LocalSearchResult,
+    LocalSearchWeights,
+    SwapLocalSearch,
+    improve_solution,
+)
 from stowage_optimizer.solvers.milp import MILPSolver, MILPWeights
 
 __all__ = [
@@ -11,9 +18,14 @@ __all__ = [
     "GeneticWeights",
     "GreedySolver",
     "GreedyWeights",
+    "LocalSearchConfig",
+    "LocalSearchResult",
+    "LocalSearchWeights",
     "MILPSolver",
     "MILPWeights",
     "Solver",
     "SolverResult",
     "SolverStatus",
+    "SwapLocalSearch",
+    "improve_solution",
 ]

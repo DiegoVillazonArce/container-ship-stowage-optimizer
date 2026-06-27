@@ -23,6 +23,7 @@ from stowage_optimizer.core.metrics import (
 from stowage_optimizer.core.problem import ProblemInstance
 from stowage_optimizer.core.solution import StowageSolution
 from stowage_optimizer.core.validation import ValidationResult, validate_instance
+from stowage_optimizer.solvers.local_search import LocalSearchResult
 
 
 class SolverStatus(StrEnum):
@@ -44,7 +45,9 @@ class SolverResult:
     scores are not comparable across algorithms (see DESIGN.md section 13).
     ``gap`` may also stay ``None`` when the underlying MILP backend does not
     expose an optimality gap. ``solver_status_detail`` preserves the backend's
-    native status string when a solver can provide one.
+    native status string when a solver can provide one. ``local_search_result``
+    is populated only when a heuristic solver was configured to run the optional
+    Phase 13 post-processing step.
     """
 
     solution: StowageSolution
@@ -54,6 +57,7 @@ class SolverResult:
     objective_value: float | None = None
     gap: float | None = None
     solver_status_detail: str | None = None
+    local_search_result: LocalSearchResult | None = None
 
     @property
     def is_feasible(self) -> bool:

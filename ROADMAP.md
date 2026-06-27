@@ -507,6 +507,12 @@ testable `app/app_helpers.py` helpers and the figures in
 
 Add a hard-constraint-preserving local search step after Greedy or GA, using container swaps to improve horizontal CG and rehandling without changing the core solver formulations.
 
+**Status:** Completed. Greedy and Genetic Algorithm can optionally run a
+deterministic swap-based local search post-processing step. Accepted swaps are
+evaluated with the shared metrics layer, preserve structural hard constraints,
+and report evaluated/accepted swaps, added runtime, and before/after CG and
+rehandling metrics.
+
 ### User Stories
 
 - As a developer, I want swap-based local search after Greedy or GA, so that constructive and evolutionary solutions can be improved.
@@ -516,17 +522,17 @@ Add a hard-constraint-preserving local search step after Greedy or GA, using con
 
 ### Tasks
 
-- [ ] Review the documented Greedy limitation around repair not rebalancing solutions that only fail horizontal CG.
-- [ ] Define a swap neighborhood for assigned containers.
-- [ ] Add hard-constraint checks for candidate swaps.
-- [ ] Score candidate swaps using horizontal CG deviation and rehandling impact.
-- [ ] Define an acceptance criterion for improving or controlled non-worsening swaps.
-- [ ] Define stopping criteria based on iterations, lack of improvement, and optional runtime.
-- [ ] Integrate local search as optional post-processing after Greedy.
-- [ ] Integrate local search as optional post-processing after GA.
-- [ ] Report local-search runtime, iteration count, and improvement metrics.
-- [ ] Add tests showing that local search preserves hard constraints.
-- [ ] Add tests showing that local search can improve CG or rehandling on hand-checkable instances.
+- [x] Review the documented Greedy limitation around repair not rebalancing solutions that only fail horizontal CG.
+- [x] Define a swap neighborhood for assigned containers.
+- [x] Add hard-constraint checks for candidate swaps.
+- [x] Score candidate swaps using horizontal CG deviation and rehandling impact.
+- [x] Define an acceptance criterion for improving or controlled non-worsening swaps.
+- [x] Define stopping criteria based on iterations, lack of improvement, and optional runtime.
+- [x] Integrate local search as optional post-processing after Greedy.
+- [x] Integrate local search as optional post-processing after GA.
+- [x] Report local-search runtime, iteration count, and improvement metrics.
+- [x] Add tests showing that local search preserves hard constraints.
+- [x] Add tests showing that local search can improve CG or rehandling on hand-checkable instances.
 
 ### Definition of Done
 
@@ -632,5 +638,5 @@ The MVP is complete when:
 - Add warm-start support for MILP from Greedy or GA solutions.
 - Cache repeated metric and fitness computations in the Genetic Algorithm.
 - Optimize real rehandling simulation for larger instances.
-- Explore broader hybrid approaches beyond the planned swap-based local search.
+- Explore broader hybrid approaches beyond the current swap-based local search.
 - Separate safe model-preserving optimizations from heuristic search-space reductions.

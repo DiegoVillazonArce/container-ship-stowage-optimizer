@@ -167,6 +167,13 @@ def _ensure_sidebar_defaults() -> None:
         "scenario_ga_crossover_probability": 0.80,
         "scenario_ga_use_seed": True,
         "scenario_ga_random_seed": 42,
+        "scenario_greedy_local_search_enabled": False,
+        "scenario_ga_local_search_enabled": False,
+        "scenario_local_search_max_iterations": helpers.DEFAULT_LOCAL_SEARCH_MAX_ITERATIONS,
+        "scenario_local_search_max_rounds_without_improvement": (
+            helpers.DEFAULT_LOCAL_SEARCH_MAX_ROUNDS_WITHOUT_IMPROVEMENT
+        ),
+        "scenario_local_search_time_limit_seconds": 0.0,
     }
     for key, value in defaults.items():
         st.session_state.setdefault(key, value)
@@ -205,6 +212,21 @@ def _apply_imported_scenario(result: helpers.ScenarioImportResult) -> None:
     st.session_state["scenario_ga_use_seed"] = params.ga_random_seed is not None
     st.session_state["scenario_ga_random_seed"] = (
         params.ga_random_seed if params.ga_random_seed is not None else 42
+    )
+    st.session_state["scenario_greedy_local_search_enabled"] = (
+        params.greedy_local_search_enabled
+    )
+    st.session_state["scenario_ga_local_search_enabled"] = params.ga_local_search_enabled
+    st.session_state["scenario_local_search_max_iterations"] = (
+        params.local_search_max_iterations
+    )
+    st.session_state["scenario_local_search_max_rounds_without_improvement"] = (
+        params.local_search_max_rounds_without_improvement
+    )
+    st.session_state["scenario_local_search_time_limit_seconds"] = (
+        params.local_search_time_limit_seconds
+        if params.local_search_time_limit_seconds is not None
+        else 0.0
     )
     st.session_state["imported_container_csv_text"] = helpers.containers_to_csv_text(
         instance.containers
@@ -510,6 +532,46 @@ def render_sidebar() -> SidebarConfig:
             )
             ga_seed = int(seed_value) if use_seed else None
 
+    greedy_local_search_enabled = False
+    ga_local_search_enabled = False
+    local_search_iterations = helpers.DEFAULT_LOCAL_SEARCH_MAX_ITERATIONS
+    local_search_rounds = helpers.DEFAULT_LOCAL_SEARCH_MAX_ROUNDS_WITHOUT_IMPROVEMENT
+    local_search_time_limit: float | None = None
+    if "Greedy" in algorithms or "Genetic Algorithm" in algorithms:
+        with st.sidebar.expander("Local search post-processing"):
+            if "Greedy" in algorithms:
+                greedy_local_search_enabled = st.checkbox(
+                    "Apply after Greedy",
+                    key="scenario_greedy_local_search_enabled",
+                )
+            if "Genetic Algorithm" in algorithms:
+                ga_local_search_enabled = st.checkbox(
+                    "Apply after Genetic Algorithm",
+                    key="scenario_ga_local_search_enabled",
+                )
+            local_search_iterations = st.number_input(
+                "Max evaluated swaps",
+                min_value=0,
+                max_value=100_000,
+                step=10,
+                key="scenario_local_search_max_iterations",
+            )
+            local_search_rounds = st.number_input(
+                "Max rounds without improvement",
+                min_value=1,
+                max_value=100,
+                step=1,
+                key="scenario_local_search_max_rounds_without_improvement",
+            )
+            local_limit = st.number_input(
+                "Time limit seconds (0 = no limit)",
+                min_value=0.0,
+                max_value=3600.0,
+                step=0.5,
+                key="scenario_local_search_time_limit_seconds",
+            )
+            local_search_time_limit = local_limit if local_limit > 0 else None
+
     params = helpers.SolverParams(
         cg_lon=cg_lon,
         cg_lat=cg_lat,
@@ -524,6 +586,11 @@ def render_sidebar() -> SidebarConfig:
         ga_mutation_probability=ga_mutation,
         ga_crossover_probability=ga_crossover,
         ga_random_seed=ga_seed,
+        greedy_local_search_enabled=greedy_local_search_enabled,
+        ga_local_search_enabled=ga_local_search_enabled,
+        local_search_max_iterations=int(local_search_iterations),
+        local_search_max_rounds_without_improvement=int(local_search_rounds),
+        local_search_time_limit_seconds=local_search_time_limit,
     )
 
     run = st.sidebar.button(
@@ -731,6 +798,14 @@ def render_result_detail(
         st.warning(message)
 
     render_kpis(result)
+    if entry["algorithm"] in ("Greedy", "Genetic Algorithm"):
+        st.markdown("**Local search**")
+        st.dataframe(
+            pd.DataFrame(helpers.local_search_summary_rows(result)),
+            use_container_width=True,
+            hide_index=True,
+        )
+
     download_key_prefix = _streamlit_key("download", entry["algorithm"])
     file_prefix = _streamlit_key(entry["algorithm"]).strip("_")
 

@@ -38,6 +38,12 @@ from stowage_optimizer.solvers.base import (
     validate_solver_input,
 )
 from stowage_optimizer.solvers.greedy import GreedySolver
+from stowage_optimizer.solvers.local_search import (
+    LocalSearchConfig,
+    LocalSearchResult,
+    LocalSearchWeights,
+    improve_solution,
+)
 
 Chromosome: TypeAlias = tuple[SlotPosition | None, ...]
 
@@ -74,6 +80,8 @@ class GeneticConfig:
     min_incompatible_bay_distance: int = DEFAULT_MIN_INCOMPATIBLE_BAY_DISTANCE
     cg_tolerance_lon: float = DEFAULT_CG_TOLERANCE_LON
     cg_tolerance_lat: float = DEFAULT_CG_TOLERANCE_LAT
+    enable_local_search: bool = False
+    local_search_config: LocalSearchConfig | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,6 +112,8 @@ class GeneticSolver(Solver):
         min_incompatible_bay_distance: int | None = None,
         cg_tolerance_lon: float | None = None,
         cg_tolerance_lat: float | None = None,
+        enable_local_search: bool | None = None,
+        local_search_config: LocalSearchConfig | None = None,
     ) -> None:
         base_config = config or GeneticConfig()
         overrides = {
@@ -120,11 +130,27 @@ class GeneticSolver(Solver):
                 "min_incompatible_bay_distance": min_incompatible_bay_distance,
                 "cg_tolerance_lon": cg_tolerance_lon,
                 "cg_tolerance_lat": cg_tolerance_lat,
+                "enable_local_search": enable_local_search,
+                "local_search_config": local_search_config,
             }.items()
             if value is not None
         }
         self._config = replace(base_config, **overrides)
         self._validate_config(self._config)
+        base_local_search_config = self._config.local_search_config or LocalSearchConfig(
+            weights=LocalSearchWeights(
+                cg_lon=self._config.weights.cg_lon,
+                cg_lat=self._config.weights.cg_lat,
+                rehandling=self._config.weights.rehandling,
+                vertical=0.05 * self._config.weights.vertical,
+            )
+        )
+        self._local_search_config = replace(
+            base_local_search_config,
+            cg_tolerance_lon=self._config.cg_tolerance_lon,
+            cg_tolerance_lat=self._config.cg_tolerance_lat,
+            min_incompatible_bay_distance=self._config.min_incompatible_bay_distance,
+        )
         self._rng = random.Random(self._config.random_seed)
 
     def solve(self, instance: ProblemInstance) -> SolverResult:
@@ -174,6 +200,16 @@ class GeneticSolver(Solver):
             cg_tolerance_lat=self._config.cg_tolerance_lat,
             min_incompatible_bay_distance=self._config.min_incompatible_bay_distance,
         )
+        local_search_result: LocalSearchResult | None = None
+        if self._config.enable_local_search:
+            local_search_result = improve_solution(
+                instance,
+                solution,
+                config=self._local_search_config,
+            )
+            solution = local_search_result.solution
+            metrics = local_search_result.metrics
+
         runtime = time.perf_counter() - start
         status = SolverStatus.FEASIBLE if metrics.is_feasible else SolverStatus.INFEASIBLE
 
@@ -183,6 +219,7 @@ class GeneticSolver(Solver):
             runtime_seconds=runtime,
             metrics=metrics,
             solver_status_detail=f"generations_run={generations_run}",
+            local_search_result=local_search_result,
         )
 
     # -- Encoding and decoding ------------------------------------------
