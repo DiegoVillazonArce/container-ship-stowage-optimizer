@@ -548,6 +548,16 @@ rehandling metrics.
 
 Add a dedicated Streamlit learning layer that explains the stowage problem, the optimization model, the implemented algorithms, and the academic assumptions from simple concepts through more technical details.
 
+**Status:** Completed. The Streamlit app now has an **Academic guide** tab with
+two-level (plain-language and technical) explanations of the problem, data
+model, hard constraints, common metrics, the Greedy / MILP / Genetic Algorithm /
+Local Search approaches, solver settings/tradeoffs, and the academic
+assumptions, plus compact constraint, metric, algorithm, settings, and
+assumption reference tables. The structured content lives
+in the Streamlit-free, unit-tested `app/learning_content.py` module so it is
+maintained independently of solver logic and stays consistent with the README
+and DESIGN documentation.
+
 ### User Stories
 
 - As a developer, I want the app to explain the container stowage problem in plain language, so that non-specialist users can understand what the project solves.
@@ -557,15 +567,15 @@ Add a dedicated Streamlit learning layer that explains the stowage problem, the 
 
 ### Tasks
 
-- [ ] Add a dedicated Streamlit tab or page for project explanation.
-- [ ] Explain the stowage problem from simple terminology to the formal optimization view.
-- [ ] Describe vessel slots, containers, route order, and unloading pressure with small examples.
-- [ ] Explain hard constraints, objective terms, and final metrics using readable text and compact formulas.
-- [ ] Explain Greedy, MILP, and Genetic Algorithm approaches and when each is useful.
-- [ ] Include academic assumptions, simplifications, and limitations.
-- [ ] Add diagrams, tables, or small visual examples where they make the explanation easier to follow.
-- [ ] Keep explanatory content separate from solver logic so it can be tested and maintained independently.
-- [ ] Add tests for any structured content helpers used by the learning layer.
+- [x] Add a dedicated Streamlit tab or page for project explanation.
+- [x] Explain the stowage problem from simple terminology to the formal optimization view.
+- [x] Describe vessel slots, containers, route order, and unloading pressure with small examples.
+- [x] Explain hard constraints, objective terms, and final metrics using readable text and compact formulas.
+- [x] Explain Greedy, MILP, and Genetic Algorithm approaches and when each is useful.
+- [x] Include academic assumptions, simplifications, and limitations.
+- [x] Add diagrams, tables, or small visual examples where they make the explanation easier to follow.
+- [x] Keep explanatory content separate from solver logic so it can be tested and maintained independently.
+- [x] Add tests for any structured content helpers used by the learning layer.
 
 ### Definition of Done
 

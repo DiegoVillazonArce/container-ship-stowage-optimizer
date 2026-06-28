@@ -33,6 +33,7 @@ import pandas as pd
 import streamlit as st
 
 import app_helpers as helpers
+import learning_content
 from stowage_optimizer.core import ProblemInstance, Route, Ship, validate_instance
 from stowage_optimizer.core.examples import create_small_example_instance
 from stowage_optimizer.core.metrics import (
@@ -797,6 +798,9 @@ def render_result_detail(
     else:
         st.warning(message)
 
+    download_key_prefix = _streamlit_key("download", entry["algorithm"])
+    file_prefix = _streamlit_key(entry["algorithm"]).strip("_")
+
     render_kpis(result)
     if entry["algorithm"] in ("Greedy", "Genetic Algorithm"):
         st.markdown("**Local search**")
@@ -804,14 +808,17 @@ def render_result_detail(
             pd.DataFrame(helpers.local_search_summary_rows(result)),
             use_container_width=True,
             hide_index=True,
+            key=f"{download_key_prefix}_local_search_summary",
         )
-
-    download_key_prefix = _streamlit_key("download", entry["algorithm"])
-    file_prefix = _streamlit_key(entry["algorithm"]).strip("_")
 
     st.markdown("**Common metrics**")
     metrics_df = pd.DataFrame(helpers.metrics_table_rows(result.metrics.as_dict()))
-    st.dataframe(metrics_df, use_container_width=True, hide_index=True)
+    st.dataframe(
+        metrics_df,
+        use_container_width=True,
+        hide_index=True,
+        key=f"{download_key_prefix}_metrics_table",
+    )
     st.download_button(
         "Download metrics CSV",
         data=helpers.metrics_csv(result.metrics.as_dict()),
@@ -823,7 +830,12 @@ def render_result_detail(
     st.markdown("**Final stowage plan**")
     rows = helpers.assignment_rows(instance, result.solution)
     if rows:
-        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        st.dataframe(
+            pd.DataFrame(rows),
+            use_container_width=True,
+            hide_index=True,
+            key=f"{download_key_prefix}_stowage_plan_table",
+        )
     else:
         st.info("No containers were assigned, so the stowage plan is empty.")
     st.download_button(
@@ -933,6 +945,7 @@ def render_diagnostics_comparison(
         pd.DataFrame(diagnostic_rows),
         use_container_width=True,
         hide_index=True,
+        key="diagnostics_comparison_table",
     )
 
     st.markdown("**Center of gravity by algorithm**")
@@ -1162,7 +1175,12 @@ def render_results() -> None:
             helpers.comparison_row(entry["algorithm"], entry["result"]) for entry in successful
         ]
         comparison = pd.DataFrame(comparison_rows)
-        st.dataframe(comparison, use_container_width=True, hide_index=True)
+        st.dataframe(
+            comparison,
+            use_container_width=True,
+            hide_index=True,
+            key="algorithm_comparison_table",
+        )
         st.download_button(
             "Download algorithm comparison CSV",
             data=helpers.comparison_csv(comparison_rows),
@@ -1199,8 +1217,171 @@ def _render_debug_expander(results: list[dict]) -> None:
 
 
 # --------------------------------------------------------------------------- #
-# Entry point                                                                   #
+# Academic learning guide (Phase 14)                                            #
 # --------------------------------------------------------------------------- #
+
+
+def render_learning() -> None:
+    """Render the Phase 14 academic explanation / learning layer.
+
+    The content is structured, two-level data from
+    :mod:`learning_content` (plain language plus a technical reading). It is kept
+    separate from the solver logic so it can be tested and maintained on its own.
+
+    Sections are chosen from a left-hand vertical radio that reads like a table
+    of contents, with the content rendered beside it. A single "technical detail"
+    toggle next to the navigation flips every topic between the plain-language
+    reading and the formal/academic one, so a non-specialist and a reviewer can
+    each get the depth they want without expanding topics one by one.
+    """
+    st.header("Academic guide")
+    st.markdown(
+        "Plain-language and technical explanations of the stowage problem, the "
+        "model, the algorithms, and the academic assumptions. No source code "
+        "reading required."
+    )
+    st.divider()
+
+    sections = learning_content.get_learning_sections()
+    nav_col, content_col = st.columns([1, 3], gap="large")
+    with nav_col:
+        selected = st.radio(
+            "Sections",
+            options=range(len(sections)),
+            format_func=lambda index: sections[index].title,
+            key="learning_section_nav",
+        )
+        st.divider()
+        show_technical = st.toggle(
+            "Show technical detail",
+            value=False,
+            key="learning_technical_mode",
+            help=(
+                "Adds compact formulas and the formal / academic reading under "
+                "each plain-language explanation."
+            ),
+        )
+    with content_col:
+        _render_learning_section(sections[selected], show_technical=show_technical)
+
+
+def _render_learning_section(
+    section: learning_content.LearningSection, show_technical: bool
+) -> None:
+    """Render one learning section: summary, diagram, topics, example, table.
+
+    When ``show_technical`` is false only the plain-language reading is shown, so
+    the default view stays clean; when true each topic also exposes its technical
+    prose and any centerpiece formula.
+    """
+    st.subheader(section.title)
+    st.info(section.summary)
+    # A small diagram up front anchors the concepts that are hardest to grasp
+    # from text alone before the reader works through the topics. Which visual a
+    # section gets is declared on the section itself, so this never branches on a
+    # section id.
+    if section.diagram:
+        _render_learning_diagram(section.diagram)
+    for position, topic in enumerate(section.topics):
+        # Open the first topic by default so the section is not just a list of
+        # collapsed titles when a user lands on it.
+        with st.expander(topic.title, expanded=(position == 0)):
+            st.markdown(topic.simple)
+            if show_technical and topic.technical:
+                st.divider()
+                st.markdown("**Technical detail**")
+                with st.container(border=True):
+                    st.markdown(topic.technical)
+                    if topic.formula:
+                        st.latex(topic.formula)
+    if section.example == "cg":
+        _render_cg_example()
+    _render_learning_table(section)
+
+
+# Captions for the inline learning diagrams, keyed by the same stable diagram
+# key a section declares. Only this UI caption lives here; the SVG bodies and the
+# section->diagram binding live in learning_content.
+_LEARNING_DIAGRAM_CAPTIONS = {
+    "grid": (
+        "Every storage position is identified by (bay, row, tier): bay runs "
+        "bow-stern, row runs port-starboard, and tier is the stacking height."
+    ),
+    "stack_continuity": (
+        "Stack continuity: a tier may only be used when the slot directly below "
+        "it is filled. The left stack is invalid (a floating container leaves a "
+        "gap below it); the right stack is valid."
+    ),
+}
+
+
+def _render_learning_diagram(key: str) -> None:
+    """Render an inline learning diagram (SVG + caption) by its stable key."""
+    builder = learning_content.LEARNING_DIAGRAMS.get(key)
+    if builder is None:
+        return
+    st.markdown(builder(), unsafe_allow_html=True)
+    caption = _LEARNING_DIAGRAM_CAPTIONS.get(key)
+    if caption:
+        st.caption(caption)
+
+
+def _render_cg_example() -> None:
+    """Render a small, self-contained center-of-gravity diagnostic example.
+
+    It reuses the Phase 12 figure builder with illustrative values (no solver
+    run required) so the Metrics section has a concrete visual of how the CG
+    tolerance box is read.
+    """
+    st.markdown("---")
+    st.subheader("Example: reading the CG tolerance box")
+    figure = build_cg_diagnostic_figure(
+        cg_x=0.06,
+        cg_y=-0.04,
+        tolerance_lon=0.15,
+        tolerance_lat=0.15,
+        title="Illustrative center-of-gravity diagnostic",
+    )
+    st.plotly_chart(
+        figure,
+        use_container_width=True,
+        key=_streamlit_key("learning", "metrics", "cg_example"),
+    )
+    st.caption(
+        "Illustrative values only. The blue x marks the ideal center (0, 0) and "
+        "the shaded square is the configured tolerance box. A computed CG inside "
+        "the box (green) is within tolerance; outside it the plan is flagged as a "
+        "balance warning even when it is structurally valid."
+    )
+
+
+def _humanize_column(name: str) -> str:
+    """Turn a snake_case row key into a human-friendly table header."""
+    return name.replace("_", " ").capitalize()
+
+
+def _render_learning_table(section: learning_content.LearningSection) -> None:
+    """Render a section's compact reference table when it declares one."""
+    if section.table is None:
+        return
+    builder = learning_content.LEARNING_TABLES.get(section.table)
+    if builder is None:
+        return
+    st.markdown("---")
+    st.subheader(f"{section.title} reference")
+    frame = pd.DataFrame(builder())
+    frame.columns = [_humanize_column(column) for column in frame.columns]
+    # Promote the first (name) column to the row label so the static table reads
+    # like a reference: the constraint / metric / algorithm name heads each row,
+    # and st.table wraps the longer explanatory cells instead of clipping them.
+    frame = frame.set_index(frame.columns[0])
+    st.table(frame)
+    if section.table == "constraints":
+        legend = learning_content.constraint_symbol_legend()
+        st.markdown(
+            "**Symbols:** "
+            + " · ".join(f"`{row['symbol']}` — {row['meaning']}" for row in legend)
+        )
 
 
 def main() -> None:
@@ -1217,7 +1398,11 @@ def main() -> None:
     if config.run:
         execute_run(config)
 
-    render_results()
+    optimizer_tab, learning_tab = st.tabs(["Optimizer", "Academic guide"])
+    with optimizer_tab:
+        render_results()
+    with learning_tab:
+        render_learning()
 
 
 if __name__ == "__main__":

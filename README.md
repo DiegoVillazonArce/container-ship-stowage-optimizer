@@ -1,6 +1,6 @@
 # Container Ship Stowage Optimizer
 
-**Status:** Phases 1 through 13 completed. Phase 14 is a planned roadmap extension covering an academic explanation layer. Core domain models, validation, a small example instance, the common metrics engine, the greedy baseline solver, the exact MILP reference solver with incumbent recovery, the genetic algorithm solver, optional swap-based local search after Greedy/GA, the Streamlit interface, Plotly 3D visualization, port-by-port unloading simulation, visual diagnostics (bay-row balance map, center-of-gravity diagnostic, readable violation explanations, and side-by-side algorithm comparison), reproducible benchmark scenarios, benchmark runner helpers, project quality tooling, CI, coverage reporting, deployment readiness, scenario/result import and export, bundled downloadable datasets, and final academic documentation are implemented. The core package, solvers, benchmark helpers, Streamlit-independent app helpers, and visualization helpers are unit-tested.
+**Status:** Phases 1 through 14 completed. Core domain models, validation, a small example instance, the common metrics engine, the greedy baseline solver, the exact MILP reference solver with incumbent recovery, the genetic algorithm solver, optional swap-based local search after Greedy/GA, the Streamlit interface, Plotly 3D visualization, port-by-port unloading simulation, visual diagnostics (bay-row balance map, center-of-gravity diagnostic, readable violation explanations, and side-by-side algorithm comparison), an academic explanation / learning layer (two-level plain-language and technical guide to the problem, model, constraints, metrics, algorithms, and assumptions), reproducible benchmark scenarios, benchmark runner helpers, project quality tooling, CI, coverage reporting, deployment readiness, scenario/result import and export, bundled downloadable datasets, and final academic documentation are implemented. The core package, solvers, benchmark helpers, Streamlit-independent app helpers, learning content, and visualization helpers are unit-tested.
 
 **Live app:** [container-ship-stowage-optimizer.streamlit.app](https://container-ship-stowage-optimizer.streamlit.app/)
 
@@ -429,7 +429,7 @@ Current roadmap status:
 | Phase 11 | Scenario & Result Export/Import | Completed |
 | Phase 12 | Visual Diagnostics | Completed |
 | Phase 13 | Local Search after Greedy/GA | Completed |
-| Phase 14 | Academic Explanation & Learning Mode | Planned |
+| Phase 14 | Academic Explanation & Learning Mode | Completed |
 
 The implemented benchmark layer compares algorithms through shared final metrics. Raw internal objective values are reported when available, but they should not be interpreted as equivalent across Greedy, MILP, and Genetic Algorithm runs.
 
@@ -710,6 +710,16 @@ metrics, and algorithm comparison can be downloaded as CSV. Bundled example
 datasets for 20, 40, 60, and 80 containers can be downloaded directly from
 the Streamlit sidebar. Validation errors are reported before any solver runs.
 
+The interface is split into an **Optimizer** tab (the workflow above) and an
+**Academic guide** tab. The academic guide explains the stowage problem, the
+data model, the hard constraints, the common metrics, the Greedy / MILP /
+Genetic Algorithm / Local Search approaches, practical solver settings and
+tradeoffs, and the academic assumptions, each at two levels: a plain-language
+reading and a more technical one. The
+explanatory content lives in the Streamlit-free, unit-tested
+`app/learning_content.py` module so it can be maintained independently of the
+solver logic.
+
 The CSV `type` column accepts `Normal`, `Reefer`, `Flammable`, or `Oxidizer`.
 
 ### Streamlit Community Cloud deployment
@@ -797,8 +807,8 @@ Safe optimizations that preserve the current model:
 - caching repeated GA fitness and metrics computations;
 - faster stack indexing for real rehandling simulation.
 
-Remaining product and presentation work is tracked in ROADMAP Phase 14,
-including an academic explanation tab.
+The academic explanation tab (ROADMAP Phase 14) is now implemented. Further
+product and presentation enhancements are tracked in the roadmap's future work.
 
 Higher-risk heuristic reductions should be documented separately because they
 can change the explored search space:

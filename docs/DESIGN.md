@@ -889,6 +889,18 @@ logic: it accepts a complete solution, evaluates swap candidates with the common
 metrics layer, preserves structural hard constraints, and reports its own
 iterations, accepted swaps, runtime, and before/after CG/rehandling metrics.
 
+Phase 14 adds an academic explanation / learning layer to the app. The
+explanatory content (problem overview, data model, hard constraints, common
+metrics, the Greedy / MILP / Genetic Algorithm / Local Search approaches, the
+practical solver settings/tradeoffs, the academic assumptions, and how to
+interpret results) lives in the Streamlit-free
+`app/learning_content.py` module as plain structured data with two reading
+levels per topic: a plain-language explanation and a more technical one. Keeping
+it separate from solver logic means the content is unit-tested and maintained
+independently, and it stays consistent with this document and the README. The
+layer is purely explanatory: it does not change any metric semantics, solver
+formulation, or dataset.
+
 Canonical scenarios:
 
 | Scenario | Purpose |
@@ -948,7 +960,7 @@ Possible extensions include:
 - More detailed stack weight and structural constraints.
 - Multiple dangerous cargo classes and richer separation rules.
 - Sensitivity analysis for objective weights.
-- More advanced visual diagnostics and academic explanation inside the app.
+- More advanced visual diagnostics building on the implemented academic explanation layer.
 - Broader hybrid GA workflows that build on the current local optimization.
 - Decomposition methods for large MILP instances.
 - Parallel fitness evaluation for the Genetic Algorithm.
