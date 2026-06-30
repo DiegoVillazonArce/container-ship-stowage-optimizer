@@ -26,13 +26,13 @@ from pathlib import Path
 from typing import Any
 
 from stowage_optimizer.core import Container, ProblemInstance, Route, Ship, StowageSolution
-from stowage_optimizer.core.validation import validate_instance
 from stowage_optimizer.core.metrics import (
     DEFAULT_CG_TOLERANCE_LAT,
     DEFAULT_CG_TOLERANCE_LON,
     DEFAULT_MIN_INCOMPATIBLE_BAY_DISTANCE,
     StowageMetrics,
 )
+from stowage_optimizer.core.validation import validate_instance
 from stowage_optimizer.solvers import (
     GeneticSolver,
     GeneticWeights,

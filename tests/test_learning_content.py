@@ -6,10 +6,8 @@ over these structures and is not unit-tested here.
 """
 
 import learning_content as content
-
 from stowage_optimizer.core.metrics import StowageMetrics
 from stowage_optimizer.solvers import GeneticSolver, GreedySolver, MILPSolver
-
 
 # -- Sections ----------------------------------------------------------------
 

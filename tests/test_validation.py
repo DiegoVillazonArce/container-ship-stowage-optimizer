@@ -1,4 +1,11 @@
-from stowage_optimizer.core import Container, ContainerType, ProblemInstance, Route, Ship, validate_instance
+from stowage_optimizer.core import (
+    Container,
+    ContainerType,
+    ProblemInstance,
+    Route,
+    Ship,
+    validate_instance,
+)
 from stowage_optimizer.core.examples import create_small_example_instance
 
 
