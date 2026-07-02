@@ -1,3 +1,5 @@
+# Runtime dependencies used by the Streamlit Cloud deployment.
+# Keep in sync with [project.dependencies] in pyproject.toml.
 pulp>=3,<4
 streamlit>=1.30
 pandas>=2.0

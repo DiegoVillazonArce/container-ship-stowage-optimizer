@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "Academic container ship stowage optimization project."
 readme = "README.md"
 requires-python = ">=3.11"
+# Keep in sync with requirements.txt, which Streamlit Cloud installs from.
 dependencies = [
     "pulp>=3,<4",
     "streamlit>=1.30",
@@ -30,6 +31,14 @@ testpaths = ["tests"]
 # ``app`` is on the path so the Streamlit-free helpers in ``app/app_helpers.py``
 # can be imported and unit-tested without launching Streamlit.
 pythonpath = ["src", "app"]
+# PuLP 3.x emits these two PuLP 4.0 migration notices on every variable and
+# solver call, flooding the test output. The ``pulp>=3,<4`` pin keeps the 3.x
+# API valid; drop these filters when migrating to PuLP 4 (see
+# docs/FUTURE_US_NOTES.md).
+filterwarnings = [
+    "ignore:Constructing LpVariable:DeprecationWarning",
+    "ignore:PULP_CBC_CMD is deprecated:DeprecationWarning",
+]
 
 [tool.coverage.run]
 branch = true
