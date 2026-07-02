@@ -286,6 +286,26 @@ def test_milp_size_guard_skips_oversized_ui_instances() -> None:
     assert "125,000" in message
 
 
+def test_heuristic_advisory_is_silent_for_small_instances() -> None:
+    instance = create_small_example_instance()
+
+    assert helpers.heuristic_size_advisory_message(instance) is None
+
+
+def test_heuristic_advisory_warns_for_oversized_grids_without_skipping() -> None:
+    instance = ProblemInstance(
+        ship=Ship(bays=50, rows=50, tiers=50),
+        containers=(Container("C1", 10.0, "Panama", "Normal"),),
+        route=Route(("Panama",)),
+    )
+
+    message = helpers.heuristic_size_advisory_message(instance)
+
+    assert message is not None
+    assert "125,000" in message
+    assert "still execute" in message
+
+
 # -- Table shaping -----------------------------------------------------------
 
 

@@ -474,7 +474,11 @@ def render_sidebar() -> SidebarConfig:
             key="scenario_min_incompatible_distance",
         )
 
-    milp_time_limit: float | None = None
+    # Solver-specific expanders render only when the algorithm is selected, but
+    # the keyed widget state persists. Falling back to session state (instead of
+    # hardcoded defaults) keeps configured values in the scenario JSON export
+    # even when the matching algorithm is currently deselected.
+    limit = st.session_state["scenario_milp_time_limit_seconds"]
     if "MILP" in algorithms:
         with st.sidebar.expander("MILP settings", expanded=True):
             limit = st.number_input(
@@ -484,13 +488,14 @@ def render_sidebar() -> SidebarConfig:
                 step=1.0,
                 key="scenario_milp_time_limit_seconds",
             )
-            milp_time_limit = limit if limit > 0 else None
+    milp_time_limit = limit if limit > 0 else None
 
-    ga_population = helpers.GA_PRESETS["Balanced"]["population_size"]
-    ga_generations = helpers.GA_PRESETS["Balanced"]["max_generations"]
-    ga_mutation = 0.05
-    ga_crossover = 0.80
-    ga_seed: int | None = 42
+    ga_population = st.session_state["scenario_ga_population_size"]
+    ga_generations = st.session_state["scenario_ga_max_generations"]
+    ga_mutation = st.session_state["scenario_ga_mutation_probability"]
+    ga_crossover = st.session_state["scenario_ga_crossover_probability"]
+    use_seed = st.session_state["scenario_ga_use_seed"]
+    seed_value = st.session_state["scenario_ga_random_seed"]
     if "Genetic Algorithm" in algorithms:
         with st.sidebar.expander("Genetic algorithm settings", expanded=True):
             ga_population = st.number_input(
@@ -531,13 +536,17 @@ def render_sidebar() -> SidebarConfig:
                 step=1,
                 key="scenario_ga_random_seed",
             )
-            ga_seed = int(seed_value) if use_seed else None
+    ga_seed = int(seed_value) if use_seed else None
 
-    greedy_local_search_enabled = False
-    ga_local_search_enabled = False
-    local_search_iterations = helpers.DEFAULT_LOCAL_SEARCH_MAX_ITERATIONS
-    local_search_rounds = helpers.DEFAULT_LOCAL_SEARCH_MAX_ROUNDS_WITHOUT_IMPROVEMENT
-    local_search_time_limit: float | None = None
+    greedy_local_search_enabled = bool(
+        st.session_state["scenario_greedy_local_search_enabled"]
+    )
+    ga_local_search_enabled = bool(st.session_state["scenario_ga_local_search_enabled"])
+    local_search_iterations = st.session_state["scenario_local_search_max_iterations"]
+    local_search_rounds = st.session_state[
+        "scenario_local_search_max_rounds_without_improvement"
+    ]
+    local_limit = st.session_state["scenario_local_search_time_limit_seconds"]
     if "Greedy" in algorithms or "Genetic Algorithm" in algorithms:
         with st.sidebar.expander("Local search post-processing"):
             if "Greedy" in algorithms:
@@ -571,7 +580,7 @@ def render_sidebar() -> SidebarConfig:
                 step=0.5,
                 key="scenario_local_search_time_limit_seconds",
             )
-            local_search_time_limit = local_limit if local_limit > 0 else None
+    local_search_time_limit = local_limit if local_limit > 0 else None
 
     params = helpers.SolverParams(
         cg_lon=cg_lon,
@@ -690,6 +699,7 @@ def run_solvers(instance: ProblemInstance, config: SidebarConfig) -> list[dict]:
             "error": None,
             "traceback": None,
             "skipped": None,
+            "advisory": None,
         }
         if algorithm == "MILP":
             skip_reason = helpers.milp_size_guard_message(instance)
@@ -697,6 +707,8 @@ def run_solvers(instance: ProblemInstance, config: SidebarConfig) -> list[dict]:
                 entry["skipped"] = skip_reason
                 results.append(entry)
                 continue
+        else:
+            entry["advisory"] = helpers.heuristic_size_advisory_message(instance)
 
         try:
             solver = helpers.build_solver(algorithm, config.params)
@@ -732,6 +744,14 @@ def execute_run(config: SidebarConfig) -> None:
     if not validation.is_valid:
         st.session_state["last_run"] = payload
         return
+
+    # Surface the slow-run advisory before the spinner starts so the user is
+    # not waiting blind on a huge grid; the per-result copy shown later covers
+    # reruns, where this transient message is no longer painted.
+    if any(algorithm != "MILP" for algorithm in config.algorithms):
+        advisory = helpers.heuristic_size_advisory_message(instance)
+        if advisory is not None:
+            st.info(advisory)
 
     with st.spinner("Running optimization…"):
         payload["results"] = run_solvers(instance, config)
@@ -790,6 +810,9 @@ def render_result_detail(
     if entry["error"] is not None:
         st.error(f"{entry['algorithm']} failed: {entry['error']}")
         return
+
+    if entry.get("advisory"):
+        st.info(entry["advisory"])
 
     result = entry["result"]
     level, message = helpers.result_status_message(entry["algorithm"], result)

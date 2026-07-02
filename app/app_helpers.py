@@ -95,6 +95,12 @@ ALGORITHMS: tuple[str, ...] = ("Greedy", "MILP", "Genetic Algorithm")
 # keeps an interactive run from accidentally building an oversized model.
 MILP_ASSIGNMENT_VARIABLE_LIMIT = 100_000
 
+# Soft advisory threshold for the heuristic solvers in the Streamlit UI.
+# Greedy and the Genetic Algorithm still run above this slot count, but their
+# candidate-slot scans grow with the grid, so the UI warns the run may be slow
+# instead of skipping it the way the hard MILP guard does.
+HEURISTIC_SLOT_ADVISORY_LIMIT = 25_000
+
 # Simple presets for the genetic algorithm so users do not need to tune every
 # operator. "Balanced" mirrors :class:`GeneticConfig` defaults.
 GA_PRESETS: dict[str, dict[str, int]] = {
@@ -751,6 +757,30 @@ def milp_size_guard_message(
         f"({len(instance.containers):,} containers x {instance.ship.slot_count:,} slots), "
         f"above the Streamlit UI limit of {max_assignment_variables:,}. "
         "Reduce the vessel size or container count, or run Greedy / Genetic Algorithm."
+    )
+
+
+def heuristic_size_advisory_message(
+    instance: ProblemInstance,
+    *,
+    max_slots: int = HEURISTIC_SLOT_ADVISORY_LIMIT,
+) -> str | None:
+    """Return a user-facing slow-run advisory for oversized heuristic runs.
+
+    Unlike :func:`milp_size_guard_message` this never skips the run: Greedy and
+    the Genetic Algorithm stay usable on any grid the UI accepts, but their
+    candidate-slot scans scale with the slot count, so very large vessels get a
+    heads-up instead of a silent long wait.
+    """
+    slot_count = instance.ship.slot_count
+    if slot_count <= max_slots:
+        return None
+
+    return (
+        f"This vessel has {slot_count:,} slots, above the advisory limit of "
+        f"{max_slots:,}. The run will still execute, but heuristic slot scans "
+        "grow with the grid and it may take a while. Consider reducing the "
+        "vessel dimensions if the run feels slow."
     )
 
 
