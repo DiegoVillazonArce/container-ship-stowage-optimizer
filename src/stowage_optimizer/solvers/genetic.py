@@ -67,12 +67,20 @@ class GeneticWeights:
 
 @dataclass(frozen=True, slots=True)
 class GeneticConfig:
-    """Configuration for the genetic search process."""
+    """Configuration for the genetic search process.
+
+    ``swap_mutation_probability`` and ``drop_mutation_probability`` shape what
+    happens to a gene once ``mutation_probability`` selects it: first a swap
+    with another random gene is attempted, otherwise the gene may be dropped to
+    ``None``, and only then is it reassigned to a random compatible slot.
+    """
 
     population_size: int = 50
     max_generations: int = 100
     mutation_probability: float = 0.05
     crossover_probability: float = 0.80
+    swap_mutation_probability: float = 0.35
+    drop_mutation_probability: float = 0.10
     tournament_size: int = 3
     elitism_count: int = 1
     random_seed: int | None = None
@@ -90,6 +98,33 @@ class _ScoredChromosome:
 
     score: float
     chromosome: Chromosome
+
+
+@dataclass(slots=True)
+class _AssignmentState:
+    """Running totals used to score repair placements incrementally.
+
+    Recomputing weight, horizontal moments, and dangerous-cargo bays from the
+    full gene list for every candidate slot made repair scoring quadratic in
+    practice; this state is built once per repair fill and updated as genes are
+    placed, which yields identical scores at a fraction of the cost.
+    """
+
+    total_weight: float = 0.0
+    moment_lon: float = 0.0
+    moment_lat: float = 0.0
+    flammable_bays: set[int] = field(default_factory=set)
+    oxidizer_bays: set[int] = field(default_factory=set)
+
+    def place(self, container: Container, slot: Slot) -> None:
+        """Account for one container placed in one slot."""
+        self.total_weight += container.weight
+        self.moment_lon += container.weight * slot.x
+        self.moment_lat += container.weight * slot.y
+        if container.type == ContainerType.FLAMMABLE:
+            self.flammable_bays.add(slot.bay)
+        elif container.type == ContainerType.OXIDIZER:
+            self.oxidizer_bays.add(slot.bay)
 
 
 class GeneticSolver(Solver):
@@ -152,6 +187,11 @@ class GeneticSolver(Solver):
             min_incompatible_bay_distance=self._config.min_incompatible_bay_distance,
         )
         self._rng = random.Random(self._config.random_seed)
+        # Per-instance memo for the slot lookup; population loops rebuild it
+        # thousands of times otherwise. Keyed by identity because solve() runs
+        # against one instance at a time.
+        self._slots_memo_instance: ProblemInstance | None = None
+        self._slots_memo: dict[SlotPosition, Slot] = {}
 
     def solve(self, instance: ProblemInstance) -> SolverResult:
         start = time.perf_counter()
@@ -374,12 +414,12 @@ class GeneticSolver(Solver):
             if self._rng.random() >= self._config.mutation_probability:
                 continue
 
-            if len(genes) > 1 and self._rng.random() < 0.35:
+            if len(genes) > 1 and self._rng.random() < self._config.swap_mutation_probability:
                 other = self._rng.randrange(len(genes))
                 genes[index], genes[other] = genes[other], genes[index]
                 continue
 
-            if self._rng.random() < 0.10:
+            if self._rng.random() < self._config.drop_mutation_probability:
                 genes[index] = None
                 continue
 
@@ -456,6 +496,7 @@ class GeneticSolver(Solver):
     ) -> None:
         slots_by_position = self._slots_by_position(instance)
         pending_order = self._ordered_indices(instance, pending)
+        state = self._assignment_state(instance, genes, slots_by_position)
 
         while pending_order:
             next_pending: list[int] = []
@@ -471,51 +512,46 @@ class GeneticSolver(Solver):
                 slot = min(
                     candidates,
                     key=lambda candidate: (
-                        self._repair_slot_score(instance, genes, container, candidate),
+                        self._repair_slot_score(instance, state, container, candidate),
                         candidate.position,
                     ),
                 )
                 genes[index] = slot.position
                 used.add(slot.position)
+                state.place(container, slot)
                 made_progress = True
 
             if not made_progress:
                 break
             pending_order = next_pending
 
-    def _repair_slot_score(
-        self,
+    @staticmethod
+    def _assignment_state(
         instance: ProblemInstance,
         genes: list[SlotPosition | None],
-        container: Container,
-        slot: Slot,
-    ) -> float:
-        slots_by_position = self._slots_by_position(instance)
-        total_weight = 0.0
-        moment_lon = 0.0
-        moment_lat = 0.0
-        flammable_bays: set[int] = set()
-        oxidizer_bays: set[int] = set()
-
+        slots_by_position: dict[SlotPosition, Slot],
+    ) -> _AssignmentState:
+        """Build the running repair totals from the currently assigned genes."""
+        state = _AssignmentState()
         for index, position in enumerate(genes):
             if position is None:
                 continue
-            assigned_slot = slots_by_position[position]
-            assigned_container = instance.containers[index]
-            total_weight += assigned_container.weight
-            moment_lon += assigned_container.weight * assigned_slot.x
-            moment_lat += assigned_container.weight * assigned_slot.y
-            if assigned_container.type == ContainerType.FLAMMABLE:
-                flammable_bays.add(assigned_slot.bay)
-            elif assigned_container.type == ContainerType.OXIDIZER:
-                oxidizer_bays.add(assigned_slot.bay)
+            state.place(instance.containers[index], slots_by_position[position])
+        return state
 
-        new_weight = total_weight + container.weight
+    def _repair_slot_score(
+        self,
+        instance: ProblemInstance,
+        state: _AssignmentState,
+        container: Container,
+        slot: Slot,
+    ) -> float:
+        new_weight = state.total_weight + container.weight
         weights = self._config.weights
-        cg_lon = abs(moment_lon + container.weight * slot.x) / new_weight
-        cg_lat = abs(moment_lat + container.weight * slot.y) / new_weight
+        cg_lon = abs(state.moment_lon + container.weight * slot.x) / new_weight
+        cg_lat = abs(state.moment_lat + container.weight * slot.y) / new_weight
         incompatible_penalty = self._incompatible_slot_penalty(
-            container, slot, flammable_bays, oxidizer_bays
+            container, slot, state.flammable_bays, state.oxidizer_bays
         )
 
         return (
@@ -538,6 +574,10 @@ class GeneticSolver(Solver):
             raise ValueError("`mutation_probability` must be between 0 and 1.")
         if not 0.0 <= config.crossover_probability <= 1.0:
             raise ValueError("`crossover_probability` must be between 0 and 1.")
+        if not 0.0 <= config.swap_mutation_probability <= 1.0:
+            raise ValueError("`swap_mutation_probability` must be between 0 and 1.")
+        if not 0.0 <= config.drop_mutation_probability <= 1.0:
+            raise ValueError("`drop_mutation_probability` must be between 0 and 1.")
         if config.tournament_size < 1:
             raise ValueError("`tournament_size` must be at least 1.")
         if config.elitism_count < 0:
@@ -549,9 +589,11 @@ class GeneticSolver(Solver):
         if config.cg_tolerance_lat < 0.0:
             raise ValueError("`cg_tolerance_lat` must be non-negative.")
 
-    @staticmethod
-    def _slots_by_position(instance: ProblemInstance) -> dict[SlotPosition, Slot]:
-        return {slot.position: slot for slot in instance.ship.slots}
+    def _slots_by_position(self, instance: ProblemInstance) -> dict[SlotPosition, Slot]:
+        if self._slots_memo_instance is not instance:
+            self._slots_memo_instance = instance
+            self._slots_memo = {slot.position: slot for slot in instance.ship.slots}
+        return self._slots_memo
 
     def _normalize_chromosome(
         self, instance: ProblemInstance, chromosome: Chromosome

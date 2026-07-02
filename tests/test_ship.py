@@ -24,6 +24,21 @@ def test_ship_adds_normalized_coordinates() -> None:
     assert (last.x, last.y, last.z) == (1.0, 1.0, 1.0)
 
 
+def test_ship_caches_generated_slots() -> None:
+    ship = Ship(bays=2, rows=2, tiers=2)
+
+    # The grid is generated once and reused; solvers iterate it heavily.
+    assert ship.slots is ship.slots
+
+
+def test_ship_equality_ignores_slot_cache_state() -> None:
+    warm = Ship(bays=2, rows=2, tiers=2)
+    cold = Ship(bays=2, rows=2, tiers=2)
+    _ = warm.slots  # Populate one cache only.
+
+    assert warm == cold
+
+
 def test_ship_marks_reefer_slots() -> None:
     ship = Ship(bays=2, rows=2, tiers=2, reefer_slots=((1, 1, 1),))
 

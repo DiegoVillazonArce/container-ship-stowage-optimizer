@@ -32,6 +32,12 @@ class Ship:
     rows: int
     tiers: int
     reefer_slots: Iterable[tuple[int, int, int]] = field(default_factory=tuple)
+    # Lazily built once per instance: solvers iterate the full grid repeatedly,
+    # and regenerating every ``Slot`` on each access dominated their runtime on
+    # larger grids. Excluded from comparison so equality stays value-based.
+    _slots_cache: tuple[Slot, ...] | None = field(
+        default=None, init=False, repr=False, compare=False
+    )
 
     def __post_init__(self) -> None:
         self._validate_dimensions()
@@ -41,7 +47,12 @@ class Ship:
 
     @property
     def slots(self) -> tuple[Slot, ...]:
-        """Generate all vessel slots with normalized coordinates."""
+        """Return all vessel slots with normalized coordinates (cached)."""
+        if self._slots_cache is None:
+            object.__setattr__(self, "_slots_cache", self._generate_slots())
+        return self._slots_cache
+
+    def _generate_slots(self) -> tuple[Slot, ...]:
         return tuple(
             Slot(
                 bay=bay,

@@ -1,3 +1,5 @@
+import pytest
+
 from stowage_optimizer.core import (
     Container,
     ContainerType,
@@ -10,6 +12,7 @@ from stowage_optimizer.core import (
 )
 from stowage_optimizer.core.examples import create_small_example_instance
 from stowage_optimizer.solvers import (
+    GeneticConfig,
     GeneticSolver,
     GreedySolver,
     MILPSolver,
@@ -213,6 +216,31 @@ def test_genetic_separates_incompatible_cargo_when_possible() -> None:
     assert result.is_feasible
     assert result.metrics.incompatible_cargo_violations == 0
     assert abs(result.solution.slot_for("FLAM")[0] - result.solution.slot_for("OXID")[0]) >= 2
+
+
+def test_genetic_rejects_out_of_range_swap_mutation_probability() -> None:
+    with pytest.raises(ValueError, match="swap_mutation_probability"):
+        GeneticSolver(config=GeneticConfig(swap_mutation_probability=1.5))
+
+
+def test_genetic_rejects_out_of_range_drop_mutation_probability() -> None:
+    with pytest.raises(ValueError, match="drop_mutation_probability"):
+        GeneticSolver(config=GeneticConfig(drop_mutation_probability=-0.1))
+
+
+def test_genetic_mutation_shape_is_configurable() -> None:
+    instance = create_small_example_instance()
+    config = GeneticConfig(
+        population_size=10,
+        max_generations=5,
+        random_seed=11,
+        swap_mutation_probability=0.9,
+        drop_mutation_probability=0.5,
+    )
+
+    result = GeneticSolver(config=config).solve(instance)
+
+    assert result.is_feasible
 
 
 def test_genetic_does_not_break_greedy_or_milp() -> None:
