@@ -278,10 +278,13 @@ class MILPSolver(Solver):
     ) -> None:
         # Each container is placed exactly once. A reefer with no compatible
         # slot yields an empty sum == 1, which is correctly infeasible.
-        for container in containers:
+        # Constraint names use the container index, not the user-provided ID:
+        # PuLP sanitizes names, so two distinct IDs (e.g. "A B" and "A_B")
+        # could otherwise collide after sanitization.
+        for c_index, container in enumerate(containers):
             problem += (
                 pulp.lpSum(assignment_vars[container.id].values()) == 1,
-                f"assign_once_{container.id}",
+                f"assign_once_{c_index}",
             )
 
     @staticmethod
@@ -351,7 +354,9 @@ class MILPSolver(Solver):
         flammable_flags = {b: pulp.LpVariable(f"F_{b}", cat=pulp.LpBinary) for b in bays}
         oxidizer_flags = {b: pulp.LpVariable(f"O_{b}", cat=pulp.LpBinary) for b in bays}
 
-        for container in instance.containers:
+        # As in ``_add_unique_assignment``, names use the container index so
+        # user-provided IDs cannot collide after PuLP's name sanitization.
+        for c_index, container in enumerate(instance.containers):
             if container.type == ContainerType.FLAMMABLE:
                 flags = flammable_flags
             elif container.type == ContainerType.OXIDIZER:
@@ -360,7 +365,7 @@ class MILPSolver(Solver):
                 continue
             for position, var in assignment_vars[container.id].items():
                 bay = position[0]
-                problem += (var <= flags[bay], f"flag_{container.id}_{bay}_{position[1]}_{position[2]}")
+                problem += (var <= flags[bay], f"flag_{c_index}_{bay}_{position[1]}_{position[2]}")
 
         # Forbid incompatible bays that are closer than the minimum distance.
         for first in bays:
