@@ -171,8 +171,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--solver",
         action="append",
-        choices=BENCHMARK_SOLVERS,
-        help="Solver to run. Can be passed more than once. Defaults to all solvers.",
+        type=_solver_name_argument,
+        metavar="{greedy,milp,genetic}",
+        help=(
+            "Solver to run; aliases such as `ga` are accepted. "
+            "Can be passed more than once. Defaults to all solvers."
+        ),
     )
     parser.add_argument(
         "--format",
@@ -289,6 +293,19 @@ def _build_solver(
         )
 
     raise ValueError(f"Unknown benchmark solver: {solver_name!r}.")
+
+
+def _solver_name_argument(value: str) -> str:
+    """Normalize a CLI ``--solver`` value, reporting aliases-aware errors.
+
+    Wrapping :func:`_normalize_solver_name` lets argparse accept aliases like
+    ``ga`` (a plain ``choices`` list would reject them before normalization)
+    while unknown names still fail with the normalizer's message.
+    """
+    try:
+        return _normalize_solver_name(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from None
 
 
 def _normalize_solver_name(name: str) -> str:
